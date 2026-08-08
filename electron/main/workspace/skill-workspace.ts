@@ -12,11 +12,19 @@ import path from 'node:path'
 import type { ConfigStore } from './config'
 import {
   listSkillFiles,
+  resolveProjectDirs,
   scanPersonalSkills,
   scanPluginSkills,
   scanProjectSkills,
 } from './filesystem-source'
+import {
+  disableSkillDir,
+  enableSkillDir,
+  removeSkillDir,
+  scaffoldSkill,
+} from './skill-manager'
 import type {
+  CreateSkillInput,
   SkillFile,
   SkillRecord,
   SourceRecord,
@@ -39,6 +47,20 @@ export type SkillWorkspace = {
   listSkillFiles(id: string): Promise<SkillFile[] | null>
   /** Absolute SKILL.md path for a known skill, for a validated reveal. Null if unknown. */
   resolveSkillPath(id: string): Promise<string | null>
+  /** Move a disabled skill back into its skills root. Returns the fresh snapshot. */
+  enableSkill(id: string): Promise<WorkspaceSnapshot>
+  /** Park a skill in its `.disabled/` folder. Returns the fresh snapshot. */
+  disableSkill(id: string): Promise<WorkspaceSnapshot>
+  /** Delete a skill from disk (destructive). Returns the fresh snapshot. */
+  removeSkill(id: string): Promise<WorkspaceSnapshot>
+  /** Scaffold a new skill folder with a SKILL.md. Returns the fresh snapshot. */
+  createSkill(input: CreateSkillInput): Promise<WorkspaceSnapshot>
+}
+
+/** Management is only meaningful for skills we own on disk, never plugin skills. */
+function assertManageable(skill: SkillRecord | null): asserts skill is SkillRecord {
+  if (!skill) throw new Error('Unknown skill.')
+  if (skill.sourceKind === 'Plugin') throw new Error('Plugin skills are managed by their plugin.')
 }
 
 export function createSkillWorkspace({ homeDir, configStore }: SkillWorkspaceDeps): SkillWorkspace {
@@ -120,6 +142,47 @@ export function createSkillWorkspace({ homeDir, configStore }: SkillWorkspaceDep
       const skill = await resolveKnown(id)
       if (!skill) return null
       return path.join(skill.realPath, 'SKILL.md')
+    },
+
+    async enableSkill(id) {
+      const skill = await resolveKnown(id)
+      assertManageable(skill)
+      if (!skill.enabled) await enableSkillDir(skill.path)
+      return buildSnapshot(await configStore.load())
+    },
+
+    async disableSkill(id) {
+      const skill = await resolveKnown(id)
+      assertManageable(skill)
+      if (skill.enabled) await disableSkillDir(skill.path)
+      return buildSnapshot(await configStore.load())
+    },
+
+    async removeSkill(id) {
+      const skill = await resolveKnown(id)
+      assertManageable(skill)
+      await removeSkillDir(skill.path)
+      return buildSnapshot(await configStore.load())
+    },
+
+    async createSkill(input) {
+      const name = input.name.trim()
+      if (!name) throw new Error('A skill name is required.')
+
+      const config = await configStore.load()
+      let root: string
+      if (input.scope === 'project') {
+        const dirs = await resolveProjectDirs(config.projectRoots)
+        const match = dirs.find((dir) => path.basename(dir) === input.projectName)
+        if (!match) throw new Error(`Unknown project: ${input.projectName ?? '(none selected)'}`)
+        root = path.join(match, '.claude', 'skills')
+      } else {
+        root = path.join(homeDir, '.claude', 'skills')
+      }
+
+      await fs.mkdir(root, { recursive: true })
+      await scaffoldSkill(root, name, input.description.trim())
+      return buildSnapshot(config)
     },
   }
 }

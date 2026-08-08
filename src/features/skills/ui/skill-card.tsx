@@ -2,16 +2,23 @@ import { FileText } from 'lucide-react'
 import { scopePillClass, type Skill } from '../model/skills'
 import { SkillToggle } from './skill-toggle'
 
-type SkillCardProps = { skill: Skill; onOpen: () => void }
+type SkillCardProps = { skill: Skill; onOpen: () => void; onToggle: () => void }
 
-export function SkillCard({ skill, onOpen }: SkillCardProps) {
+export function SkillCard({ skill, onOpen, onToggle }: SkillCardProps) {
   const chips = skill.scope === 'project' ? skill.projects.slice(0, 2) : []
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onOpen}
-      className="flex flex-col gap-3 rounded-[13px] border border-[#232328] bg-[#101013] p-4 text-left transition hover:-translate-y-0.5 hover:border-[#3a3a42]"
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onOpen()
+        }
+      }}
+      className="flex cursor-pointer flex-col gap-3 rounded-[13px] border border-[#232328] bg-[#101013] p-4 text-left transition hover:-translate-y-0.5 hover:border-[#3a3a42] focus-visible:border-[#3a3a42] focus-visible:outline-none"
     >
       <div className="flex items-start gap-3">
         <div
@@ -32,7 +39,7 @@ export function SkillCard({ skill, onOpen }: SkillCardProps) {
           <div className="mt-0.5 truncate font-mono text-[11px] text-[#52525b]">{skill.source}</div>
         </div>
         <span className="mt-1 shrink-0">
-          <SkillToggle enabled={skill.enabled} />
+          <SkillToggle enabled={skill.enabled} onToggle={onToggle} disabled={skill.scope === 'plugin'} />
         </span>
       </div>
 
@@ -52,6 +59,6 @@ export function SkillCard({ skill, onOpen }: SkillCardProps) {
           {skill.fileCount} {skill.fileCount === 1 ? 'file' : 'files'}
         </span>
       </div>
-    </button>
+    </div>
   )
 }

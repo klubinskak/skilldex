@@ -53,6 +53,13 @@ export type WorkspaceConfig = {
   projectRoots: string[]
 }
 
+export type CreateSkillInput = {
+  name: string
+  description: string
+  scope: 'global' | 'project'
+  projectName?: string
+}
+
 /**
  * UI scope shown on cards and filters. The mockup uses two scopes; we map our
  * three source kinds onto them: Personal → "global", Plugin → "plugin",

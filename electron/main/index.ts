@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { createConfigStore } from './workspace/config'
 import { createSkillWorkspace } from './workspace/skill-workspace'
-import type { WorkspaceConfig } from './workspace/types'
+import type { CreateSkillInput, WorkspaceConfig } from './workspace/types'
 
 function createMainWindow() {
   const window = new BrowserWindow({
@@ -44,6 +44,10 @@ app.whenReady().then(() => {
     if (target) shell.showItemInFolder(target)
     return target !== null
   })
+  ipcMain.handle('skilldex:enable-skill', (_event, id: string) => workspace.enableSkill(id))
+  ipcMain.handle('skilldex:disable-skill', (_event, id: string) => workspace.disableSkill(id))
+  ipcMain.handle('skilldex:remove-skill', (_event, id: string) => workspace.removeSkill(id))
+  ipcMain.handle('skilldex:create-skill', (_event, input: CreateSkillInput) => workspace.createSkill(input))
 
   createMainWindow()
 

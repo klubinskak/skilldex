@@ -8,6 +8,8 @@ type SkillDetailProps = {
   getReadme: (id: string) => Promise<string | null>
   listFiles: (id: string) => Promise<SkillFile[] | null>
   reveal: (id: string) => Promise<boolean>
+  onToggle: () => void
+  onRemove: () => void
   onBack: () => void
 }
 
@@ -19,11 +21,13 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export function SkillDetail({ skill, getReadme, listFiles, reveal, onBack }: SkillDetailProps) {
+export function SkillDetail({ skill, getReadme, listFiles, reveal, onToggle, onRemove, onBack }: SkillDetailProps) {
   const [tab, setTab] = useState<Tab>('instructions')
   const [readme, setReadme] = useState<string | null>(null)
   const [files, setFiles] = useState<SkillFile[] | null>(null)
   const [loading, setLoading] = useState(true)
+  const [confirmingRemove, setConfirmingRemove] = useState(false)
+  const manageable = skill.scope !== 'plugin'
 
   useEffect(() => {
     let active = true
@@ -159,7 +163,7 @@ export function SkillDetail({ skill, getReadme, listFiles, reveal, onBack }: Ski
               {skill.enabled ? 'Enabled' : 'Disabled'}
             </div>
           </div>
-          <SkillToggle enabled={skill.enabled} size="lg" />
+          <SkillToggle enabled={skill.enabled} size="lg" onToggle={onToggle} disabled={!manageable} />
         </div>
 
         <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#52525b]">Details</div>
@@ -187,13 +191,64 @@ export function SkillDetail({ skill, getReadme, listFiles, reveal, onBack }: Ski
         </button>
         <button
           type="button"
-          disabled
-          title="Skill management is coming soon"
-          className="mt-2 h-9 w-full cursor-not-allowed rounded-[9px] border border-[#3f2020] bg-transparent text-[12.5px] font-medium text-[#f87171] opacity-60"
+          disabled={!manageable}
+          onClick={() => setConfirmingRemove(true)}
+          title={manageable ? 'Uninstall this skill' : 'Plugin skills are managed by their plugin'}
+          className={`mt-2 h-9 w-full rounded-[9px] border border-[#3f2020] bg-transparent text-[12.5px] font-medium text-[#f87171] transition ${
+            manageable ? 'hover:bg-[#1e1010]' : 'cursor-not-allowed opacity-60'
+          }`}
         >
           Uninstall
         </button>
       </aside>
+
+      {confirmingRemove && (
+        <ConfirmRemove
+          name={skill.name}
+          onCancel={() => setConfirmingRemove(false)}
+          onConfirm={() => {
+            setConfirmingRemove(false)
+            onRemove()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function ConfirmRemove({ name, onConfirm, onCancel }: { name: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div
+      onClick={onCancel}
+      className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-[3px]"
+    >
+      <div
+        onClick={(event) => event.stopPropagation()}
+        className="w-[440px] overflow-hidden rounded-2xl border border-[#2a2a30] bg-[#111114] shadow-[0_40px_100px_-20px_rgba(0,0,0,.9)]"
+      >
+        <div className="px-6 pt-5">
+          <h2 className="text-lg font-semibold text-[#fafafa]">Uninstall “{name}”?</h2>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-[#a1a1aa]">
+            This deletes the skill directory from disk. This cannot be undone.
+          </p>
+        </div>
+        <div className="mt-5 flex justify-end gap-2.5 border-t border-[#1c1c20] bg-[#0c0c0e] px-6 py-4">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="h-9 rounded-[9px] border border-[#27272a] bg-transparent px-4 text-[13px] font-medium text-[#d4d4d8] transition hover:border-[#3a3a42]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="h-9 rounded-[9px] bg-[#dc2626] px-[18px] text-[13px] font-semibold text-white transition hover:bg-[#b91c1c]"
+          >
+            Uninstall
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

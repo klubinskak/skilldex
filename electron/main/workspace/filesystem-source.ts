@@ -8,7 +8,17 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { parseFrontmatter } from './frontmatter'
+import { DISABLED_DIR } from './skill-manager'
 import type { ProjectRecord, SkillFile, SkillRecord } from './types'
+
+/** Everything `readSkill` needs beyond the directory itself. */
+type ReadContext = {
+  sourceKind: SkillRecord['sourceKind']
+  sourceRoot: string
+  homeDir: string
+  projects: string[]
+  enabled: boolean
+}
 
 export type ScanResult = {
   skills: SkillRecord[]
@@ -73,13 +83,7 @@ async function listSkillDirs(dir: string): Promise<string[]> {
   return dirs
 }
 
-async function readSkill(
-  skillDir: string,
-  sourceKind: SkillRecord['sourceKind'],
-  sourceRoot: string,
-  homeDir: string,
-  projects: string[],
-): Promise<SkillRecord> {
+async function readSkill(skillDir: string, ctx: ReadContext): Promise<SkillRecord> {
   const skillMd = path.join(skillDir, 'SKILL.md')
   const content = await fs.readFile(skillMd, 'utf8')
   const frontmatter = parseFrontmatter(content)
@@ -103,31 +107,41 @@ async function readSkill(
     description: frontmatter.description?.trim() ?? '',
     path: skillDir,
     realPath,
-    sourceKind,
-    sourceRoot: tildify(sourceRoot, homeDir),
-    displayPath: tildify(realPath, homeDir),
-    enabled: true,
+    sourceKind: ctx.sourceKind,
+    sourceRoot: tildify(ctx.sourceRoot, ctx.homeDir),
+    displayPath: tildify(realPath, ctx.homeDir),
+    enabled: ctx.enabled,
     isSymlink,
     fileCount,
-    projects,
+    projects: ctx.projects,
   }
 }
 
-async function readSkillsIn(
-  skillsRoot: string,
-  sourceKind: SkillRecord['sourceKind'],
-  sourceRoot: string,
-  homeDir: string,
-  projects: string[],
-): Promise<SkillRecord[]> {
+async function readSkillsIn(skillsRoot: string, ctx: ReadContext): Promise<SkillRecord[]> {
   const dirs = await listSkillDirs(skillsRoot)
   const skills: SkillRecord[] = []
   for (const dir of dirs) {
     try {
-      skills.push(await readSkill(dir, sourceKind, sourceRoot, homeDir, projects))
+      skills.push(await readSkill(dir, ctx))
     } catch {
       // Skip an unreadable individual skill; surface the source, not the noise.
     }
+  }
+  return skills
+}
+
+/**
+ * Read the enabled skills directly under a root, plus any disabled ones parked
+ * in its `.disabled/` sibling (surfaced with `enabled: false`).
+ */
+async function readEnabledAndDisabled(
+  skillsRoot: string,
+  ctx: Omit<ReadContext, 'enabled'>,
+): Promise<SkillRecord[]> {
+  const skills = await readSkillsIn(skillsRoot, { ...ctx, enabled: true })
+  const disabledRoot = path.join(skillsRoot, DISABLED_DIR)
+  if (await exists(disabledRoot)) {
+    skills.push(...(await readSkillsIn(disabledRoot, { ...ctx, enabled: false })))
   }
   return skills
 }
@@ -137,7 +151,7 @@ export async function scanPersonalSkills(homeDir: string): Promise<ScanResult> {
   const root = path.join(homeDir, '.claude', 'skills')
   if (!(await exists(root))) return { skills: [] }
   try {
-    return { skills: await readSkillsIn(root, 'Personal', root, homeDir, []) }
+    return { skills: await readEnabledAndDisabled(root, { sourceKind: 'Personal', sourceRoot: root, homeDir, projects: [] }) }
   } catch (error) {
     return { skills: [], error: describe(error) }
   }
@@ -158,7 +172,7 @@ export async function scanPluginSkills(homeDir: string): Promise<ScanResult> {
           const skillsDir = path.join(bucketDir, plugin, 'skills')
           if (!(await exists(skillsDir))) continue
           const root = path.join(homeDir, '.claude', 'plugins')
-          skills.push(...(await readSkillsIn(skillsDir, 'Plugin', root, homeDir, [])))
+          skills.push(...(await readSkillsIn(skillsDir, { sourceKind: 'Plugin', sourceRoot: root, homeDir, projects: [], enabled: true })))
         }
       }
     }
@@ -179,14 +193,10 @@ export async function scanProjectSkills(projectRoots: string[], homeDir: string)
 
   for (const root of projectRoots) {
     try {
-      const projectDirs = (await exists(path.join(root, '.claude', 'skills')))
-        ? [root]
-        : await expandWorkspace(root)
-
-      for (const projectDir of projectDirs) {
+      for (const projectDir of await projectDirsUnder(root)) {
         const name = path.basename(projectDir)
         const skillsDir = path.join(projectDir, '.claude', 'skills')
-        const found = await readSkillsIn(skillsDir, 'Project', projectDir, homeDir, [name])
+        const found = await readEnabledAndDisabled(skillsDir, { sourceKind: 'Project', sourceRoot: projectDir, homeDir, projects: [name] })
         if (found.length === 0) continue
         skills.push(...found)
         projects.push({ name, path: tildify(projectDir, homeDir), skillCount: found.length })
@@ -199,6 +209,12 @@ export async function scanProjectSkills(projectRoots: string[], homeDir: string)
   return { skills, projects, errors }
 }
 
+/** A root is itself a project if it has `.claude/skills`; otherwise its children are. */
+async function projectDirsUnder(root: string): Promise<string[]> {
+  if (await exists(path.join(root, '.claude', 'skills'))) return [root]
+  return expandWorkspace(root)
+}
+
 async function expandWorkspace(root: string): Promise<string[]> {
   const children = await fs.readdir(root, { withFileTypes: true })
   const projects: string[] = []
@@ -208,6 +224,19 @@ async function expandWorkspace(root: string): Promise<string[]> {
     if (await exists(path.join(projectDir, '.claude', 'skills'))) projects.push(projectDir)
   }
   return projects
+}
+
+/** Absolute project directories under the configured roots (for skill creation). */
+export async function resolveProjectDirs(projectRoots: string[]): Promise<string[]> {
+  const dirs: string[] = []
+  for (const root of projectRoots) {
+    try {
+      dirs.push(...(await projectDirsUnder(root)))
+    } catch {
+      // A root that can't be read is reported by scanProjectSkills, not here.
+    }
+  }
+  return dirs
 }
 
 function describe(error: unknown): string {

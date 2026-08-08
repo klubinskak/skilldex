@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   emptySnapshot,
   toSkill,
+  type CreateSkillInput,
   type Skill,
   type SkillFile,
   type WorkspaceConfig,
@@ -18,6 +19,10 @@ export type WorkspaceState = {
   getReadme: (id: string) => Promise<string | null>
   listFiles: (id: string) => Promise<SkillFile[] | null>
   reveal: (id: string) => Promise<boolean>
+  enable: (id: string) => Promise<WorkspaceSnapshot | null>
+  disable: (id: string) => Promise<WorkspaceSnapshot | null>
+  remove: (id: string) => Promise<WorkspaceSnapshot | null>
+  create: (input: CreateSkillInput) => Promise<WorkspaceSnapshot | null>
 }
 
 const bridge = () => (typeof window !== 'undefined' ? window.skilldex?.workspace : undefined)
@@ -49,6 +54,28 @@ export function useWorkspace(): WorkspaceState {
     await run(() => workspace.getSnapshot())
   }, [run])
 
+  // A mutation that surfaces its failure to the caller so the UI can react
+  // (e.g. keep a confirmation dialog open) rather than only setting error state.
+  const mutate = useCallback(
+    async (
+      op: (workspace: NonNullable<ReturnType<typeof bridge>>) => Promise<WorkspaceSnapshot>,
+    ): Promise<WorkspaceSnapshot | null> => {
+      const workspace = bridge()
+      if (!workspace) return null
+      try {
+        const next = await op(workspace)
+        setSnapshot(next)
+        setError(null)
+        return next
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : String(cause)
+        setError(message)
+        throw new Error(message)
+      }
+    },
+    [],
+  )
+
   const configure = useCallback(
     async (config: WorkspaceConfig) => {
       const workspace = bridge()
@@ -61,6 +88,10 @@ export function useWorkspace(): WorkspaceState {
   const getReadme = useCallback((id: string) => bridge()?.getSkillReadme(id) ?? Promise.resolve(null), [])
   const listFiles = useCallback((id: string) => bridge()?.listSkillFiles(id) ?? Promise.resolve(null), [])
   const reveal = useCallback((id: string) => bridge()?.revealSkill(id) ?? Promise.resolve(false), [])
+  const enable = useCallback((id: string) => mutate((w) => w.enableSkill(id)), [mutate])
+  const disable = useCallback((id: string) => mutate((w) => w.disableSkill(id)), [mutate])
+  const remove = useCallback((id: string) => mutate((w) => w.removeSkill(id)), [mutate])
+  const create = useCallback((input: CreateSkillInput) => mutate((w) => w.createSkill(input)), [mutate])
 
   useEffect(() => {
     void rescan()
@@ -76,5 +107,9 @@ export function useWorkspace(): WorkspaceState {
     getReadme,
     listFiles,
     reveal,
+    enable,
+    disable,
+    remove,
+    create,
   }
 }

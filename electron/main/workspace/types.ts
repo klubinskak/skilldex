@@ -72,6 +72,14 @@ export type WorkspaceConfig = {
   projectRoots: string[]
 }
 
+export type CreateSkillInput = {
+  name: string
+  description: string
+  scope: 'global' | 'project'
+  /** Project directory name (from a ProjectRecord); required when scope is 'project'. */
+  projectName?: string
+}
+
 export const defaultConfig: WorkspaceConfig = {
   includePersonal: true,
   includePlugins: true,

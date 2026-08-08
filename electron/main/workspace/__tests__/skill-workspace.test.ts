@@ -111,4 +111,56 @@ describe('SkillWorkspace', () => {
     expect(await workspace.resolveSkillPath(alpha.id)).toMatch(/alpha\/SKILL\.md$/)
     expect(await workspace.resolveSkillPath('/etc/passwd')).toBeNull()
   })
+
+  describe('management', () => {
+    it('disables then re-enables a personal skill', async () => {
+      const before = await workspace.getSnapshot()
+      const alpha = before.skills.find((s) => s.name === 'alpha')!
+
+      const disabled = await workspace.disableSkill(alpha.id)
+      const off = disabled.skills.find((s) => s.name === 'alpha')!
+      expect(off.enabled).toBe(false)
+
+      const enabled = await workspace.enableSkill(off.id)
+      expect(enabled.skills.find((s) => s.name === 'alpha')!.enabled).toBe(true)
+    })
+
+    it('removes a personal skill from disk', async () => {
+      const before = await workspace.getSnapshot()
+      const beta = before.skills.find((s) => s.name === 'beta')!
+      const after = await workspace.removeSkill(beta.id)
+      expect(after.skills.find((s) => s.name === 'beta')).toBeUndefined()
+    })
+
+    it('refuses to manage plugin skills', async () => {
+      const snapshot = await workspace.getSnapshot()
+      const gamma = snapshot.skills.find((s) => s.name === 'gamma')!
+      await expect(workspace.disableSkill(gamma.id)).rejects.toThrow(/plugin/i)
+      await expect(workspace.removeSkill(gamma.id)).rejects.toThrow(/plugin/i)
+    })
+
+    it('creates a global skill', async () => {
+      const after = await workspace.createSkill({ name: 'New Thing', description: 'does stuff', scope: 'global' })
+      const created = after.skills.find((s) => s.name === 'new-thing')
+      expect(created?.sourceKind).toBe('Personal')
+    })
+
+    it('creates a project skill in the named project', async () => {
+      await workspace.configureSources({ includePersonal: false, includePlugins: false, projectRoots: [workspaceRoot] })
+      const after = await workspace.createSkill({
+        name: 'Proj Skill',
+        description: 'scoped',
+        scope: 'project',
+        projectName: 'proj1',
+      })
+      const created = after.skills.find((s) => s.name === 'proj-skill')
+      expect(created?.sourceKind).toBe('Project')
+      expect(created?.projects).toContain('proj1')
+    })
+
+    it('rejects a duplicate skill name', async () => {
+      await workspace.createSkill({ name: 'dupe', description: '', scope: 'global' })
+      await expect(workspace.createSkill({ name: 'dupe', description: '', scope: 'global' })).rejects.toThrow(/exists/i)
+    })
+  })
 })

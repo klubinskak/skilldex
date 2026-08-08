@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { AlertCircle, ListFilter, Loader2, Plus, RefreshCw } from 'lucide-react'
 import { Sidebar, type FilterKey, type SidebarCounts } from '@/features/navigation/ui/sidebar'
+import type { Skill } from '@/features/skills/model/skills'
 import { useWorkspace } from '@/features/skills/model/use-workspace'
 import { CreateSkillDialog } from '@/features/skills/ui/create-skill-dialog'
 import { SkillCard } from '@/features/skills/ui/skill-card'
@@ -37,11 +38,35 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
 ]
 
 export function Dashboard() {
-  const { skills, snapshot, loading, error, rescan, getReadme, listFiles, reveal } = useWorkspace()
+  const { skills, snapshot, loading, error, rescan, getReadme, listFiles, reveal, enable, disable, remove, create } =
+    useWorkspace()
   const [filter, setFilter] = useState<FilterKey>('all')
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+
+  // Enabling/disabling moves a skill on disk, so its id changes. Re-select the
+  // same skill (by name + kind) in the new snapshot so the detail view stays put.
+  const toggleSkill = async (skill: Skill) => {
+    try {
+      const next = await (skill.enabled ? disable(skill.id) : enable(skill.id))
+      if (next && selectedId === skill.id) {
+        const match = next.skills.find((s) => s.name === skill.name && s.sourceKind === skill.sourceKind)
+        setSelectedId(match ? match.id : null)
+      }
+    } catch {
+      // Error surfaced via the hook's error state.
+    }
+  }
+
+  const removeSkill = async (id: string) => {
+    try {
+      await remove(id)
+      setSelectedId(null)
+    } catch {
+      // Error surfaced via the hook's error state.
+    }
+  }
 
   const counts: SidebarCounts = useMemo(
     () => ({
@@ -76,6 +101,8 @@ export function Dashboard() {
             getReadme={getReadme}
             listFiles={listFiles}
             reveal={reveal}
+            onToggle={() => void toggleSkill(selected)}
+            onRemove={() => void removeSkill(selected.id)}
             onBack={() => setSelectedId(null)}
           />
         ) : (
@@ -150,7 +177,12 @@ export function Dashboard() {
               ) : (
                 <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-2">
                   {visibleSkills.map((skill) => (
-                    <SkillCard key={skill.id} skill={skill} onOpen={() => setSelectedId(skill.id)} />
+                    <SkillCard
+                      key={skill.id}
+                      skill={skill}
+                      onOpen={() => setSelectedId(skill.id)}
+                      onToggle={() => void toggleSkill(skill)}
+                    />
                   ))}
                 </div>
               )}
@@ -159,7 +191,14 @@ export function Dashboard() {
         )}
       </main>
 
-      <CreateSkillDialog open={showCreate} onClose={() => setShowCreate(false)} />
+      <CreateSkillDialog
+        open={showCreate}
+        projects={snapshot.projects}
+        onClose={() => setShowCreate(false)}
+        onCreate={async (input) => {
+          await create(input)
+        }}
+      />
     </div>
   )
 }
