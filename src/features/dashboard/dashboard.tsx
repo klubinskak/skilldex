@@ -5,6 +5,7 @@ import { SettingsDialog } from '@/features/settings/ui/settings-dialog'
 import type { Skill } from '@/features/skills/model/skills'
 import { useWorkspace } from '@/features/skills/model/use-workspace'
 import { CreateSkillDialog } from '@/features/skills/ui/create-skill-dialog'
+import { ProjectGroups } from '@/features/skills/ui/project-groups'
 import { SkillCard } from '@/features/skills/ui/skill-card'
 import { SkillDetail } from '@/features/skills/ui/skill-detail'
 
@@ -104,6 +105,14 @@ export function Dashboard() {
     )
   }, [skills, filter, query])
 
+  // In the Project tab, organize the (already search-filtered) skills by project.
+  const projectGroups = useMemo(() => {
+    if (filter !== 'project') return null
+    return snapshot.projects
+      .map((project) => ({ project, skills: visibleSkills.filter((skill) => skill.projects.includes(project.name)) }))
+      .filter((group) => group.skills.length > 0)
+  }, [filter, snapshot.projects, visibleSkills])
+
   const selected = selectedId ? skills.find((skill) => skill.id === selectedId) ?? null : null
   const heading = HEADINGS[filter]
 
@@ -195,6 +204,12 @@ export function Dashboard() {
                       ? 'No project skills yet. Add a project folder in Settings.'
                       : 'No skills found in this scope yet.'}
                 </div>
+              ) : projectGroups && projectGroups.length > 0 ? (
+                <ProjectGroups
+                  groups={projectGroups}
+                  onOpen={(id) => setSelectedId(id)}
+                  onToggle={(skill) => void toggleSkill(skill)}
+                />
               ) : (
                 <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-2">
                   {visibleSkills.map((skill) => (
