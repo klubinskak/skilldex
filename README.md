@@ -4,7 +4,8 @@ Skilldex is a local-first dashboard for developers to discover, organize, and fa
 
 ## Current foundation
 
-- React, TypeScript, Vite, Tailwind CSS, and shadcn/ui
+- Electron, React, TypeScript, Tailwind CSS, and shadcn/ui
+- Context-isolated Electron preload bridge; the renderer has no direct Node.js or filesystem access
 - Interactive overview dashboard with search and favourites
 - Normalized sample catalog showing global, project, and repository skill sources
 - A UI seam ready for a future `SkillWorkspace` module that discovers local skill directories and Git metadata
@@ -39,6 +40,7 @@ npm run dev
 ```bash
 npm run build
 npm run lint
+npm run package
 ```
 
 ## Next implementation slice

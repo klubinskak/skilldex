@@ -1,43 +1,113 @@
-import { FolderGit2, GitFork, Heart, LayoutGrid, Plus, Settings, Sparkles } from 'lucide-react'
-import { Button } from '@/ui/button'
+import { Blocks, Boxes, FolderGit2, Globe, LayoutGrid, Monitor, Search, Settings } from 'lucide-react'
+import type { ComponentType } from 'react'
+import { ACCENT_PALETTE, type ProjectRecord } from '@/features/skills/model/skills'
 
-const navItems = [
-  { label: 'Overview', icon: LayoutGrid },
-  { label: 'All skills', icon: Sparkles },
-  { label: 'Projects', icon: FolderGit2 },
-  { label: 'Repositories', icon: GitFork },
-]
+export type FilterKey = 'all' | 'global' | 'plugin' | 'project'
+
+export type SidebarCounts = Record<FilterKey, number>
 
 type SidebarProps = {
-  activeItem: string
-  favouriteCount: number
-  onChange: (item: string) => void
-  onAddSource: () => void
+  active: FilterKey
+  counts: SidebarCounts
+  projects: ProjectRecord[]
+  query: string
+  onQuery: (value: string) => void
+  onFilter: (key: FilterKey) => void
 }
 
-export function Sidebar({ activeItem, favouriteCount, onChange, onAddSource }: SidebarProps) {
+const NAV: Array<{ key: FilterKey; label: string; icon: ComponentType<{ className?: string }> }> = [
+  { key: 'all', label: 'All Skills', icon: LayoutGrid },
+  { key: 'global', label: 'Global', icon: Globe },
+  { key: 'plugin', label: 'Plugins', icon: Blocks },
+  { key: 'project', label: 'Projects', icon: FolderGit2 },
+]
+
+export function Sidebar({ active, counts, projects, query, onQuery, onFilter }: SidebarProps) {
   return (
-    <aside className="border-b border-slate-200 bg-white px-5 py-6 lg:border-r lg:border-b-0">
-      <div className="flex items-center justify-between lg:block">
-        <div className="flex items-center gap-3">
-          <div className="grid size-9 place-items-center rounded-xl bg-slate-950 text-sm font-bold text-white">S</div>
-          <div><p className="font-semibold tracking-tight">Skilldex</p><p className="text-xs text-slate-500">Your skill workspace</p></div>
+    <aside className="flex w-[248px] shrink-0 flex-col border-r border-[#1c1c20] bg-[#0b0b0d] px-3 py-3.5">
+      <div className="flex items-center gap-2.5 px-2 pb-3.5 pt-1.5">
+        <div className="grid size-[30px] place-items-center rounded-[9px] bg-gradient-to-br from-[#f97316] to-[#ea580c] shadow-[0_4px_14px_-2px_rgba(249,115,22,.5)]">
+          <Boxes className="size-[17px] text-white" />
         </div>
-        <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Open settings"><Settings className="size-4" /></Button>
+        <span className="text-[15.5px] font-semibold tracking-tight text-[#fafafa]">Skilldex</span>
       </div>
 
-      <nav className="mt-8 grid grid-cols-2 gap-1 sm:grid-cols-4 lg:grid-cols-1" aria-label="Primary navigation">
-        {navItems.map((item) => {
+      <label className="relative mb-4 block">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[#52525b]" />
+        <input
+          value={query}
+          onChange={(event) => onQuery(event.target.value)}
+          placeholder="Search skills…"
+          className="h-[34px] w-full rounded-[9px] border border-[#27272a] bg-[#111114] pl-[30px] pr-8 text-[13px] text-[#e4e4e7] outline-none placeholder:text-[#52525b] focus:border-[#3a3a42]"
+        />
+        <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-[5px] border border-[#27272a] bg-[#18181b] px-1.5 py-0.5 font-mono text-[10px] text-[#52525b]">
+          ⌘K
+        </span>
+      </label>
+
+      <div className="px-2 pb-2 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-[#52525b]">Library</div>
+      <nav className="flex flex-col gap-0.5">
+        {NAV.map((item) => {
           const Icon = item.icon
-          const active = activeItem === item.label
-          return <button className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition ${active ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'}`} key={item.label} onClick={() => onChange(item.label)} type="button"><Icon className="size-4" />{item.label}</button>
+          const isActive = active === item.key
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => onFilter(item.key)}
+              className={`flex items-center gap-3 rounded-[9px] px-2 py-2 text-[13.5px] font-medium transition ${
+                isActive
+                  ? 'bg-[#1a1109] text-[#fb923c] shadow-[inset_2px_0_0_#f97316]'
+                  : 'text-[#a1a1aa] hover:bg-[#141417]'
+              }`}
+            >
+              <span className="flex w-[18px] justify-center">
+                <Icon className="size-[15px]" />
+              </span>
+              <span className="flex-1 text-left">{item.label}</span>
+              <span className={`font-mono text-[11px] ${isActive ? 'text-[#fb923c]' : 'text-[#52525b]'}`}>
+                {counts[item.key]}
+              </span>
+            </button>
+          )
         })}
       </nav>
 
-      <div className="mt-8 hidden lg:block"><p className="px-3 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">Collections</p><button className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-slate-600 hover:bg-slate-100" type="button"><Heart className="size-4" />Favourites<span className="ml-auto text-xs text-slate-400">{favouriteCount}</span></button></div>
+      <div className="px-2 pb-2 pt-5 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-[#52525b]">
+        Projects
+      </div>
+      <div className="flex flex-col gap-0.5">
+        {projects.length === 0 ? (
+          <p className="px-2 text-[12px] leading-relaxed text-[#52525b]">
+            No project sources yet. Add a project folder to see it here.
+          </p>
+        ) : (
+          projects.map((project, index) => (
+            <div
+              key={project.path}
+              className="flex items-center gap-3 rounded-[9px] px-2 py-1.5 text-[13px] text-[#a1a1aa]"
+            >
+              <span
+                className="size-2 shrink-0 rounded-[3px]"
+                style={{ background: ACCENT_PALETTE[index % ACCENT_PALETTE.length] }}
+              />
+              <span className="flex-1 truncate">{project.name}</span>
+              <span className="font-mono text-[11px] text-[#52525b]">{project.skillCount}</span>
+            </div>
+          ))
+        )}
+      </div>
 
-      <div className="mt-8 hidden rounded-xl border border-slate-200 bg-slate-50 p-4 lg:block"><div className="flex items-center justify-between"><p className="text-sm font-medium">Sources</p><span className="flex size-2 rounded-full bg-emerald-500" /></div><p className="mt-2 text-sm leading-5 text-slate-500">2 global directories and 1 repository ready to scan.</p><Button className="mt-4 w-full" variant="outline" size="sm" onClick={onAddSource}><Plus className="size-3.5" />Add source</Button></div>
-      <div className="mt-auto hidden pt-8 lg:block"><button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-600 hover:bg-slate-100" type="button"><Settings className="size-4" />Settings</button></div>
+      <div className="mt-auto flex items-center gap-2.5 border-t border-[#1c1c20] px-2 pt-2.5">
+        <div className="grid size-7 place-items-center rounded-lg bg-[#27272a] text-[#d4d4d8]">
+          <Monitor className="size-3.5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[12.5px] font-medium text-[#e4e4e7]">Local machine</div>
+          <div className="text-[11px] text-[#52525b]">Sign in coming soon</div>
+        </div>
+        <Settings className="size-4 text-[#52525b]" />
+      </div>
     </aside>
   )
 }
