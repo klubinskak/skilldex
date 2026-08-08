@@ -111,6 +111,7 @@ export function createSkillWorkspace({ homeDir, configStore }: SkillWorkspaceDep
       sources,
       errors,
       scannedAt: new Date().toISOString(),
+      homeDir,
     }
   }
 

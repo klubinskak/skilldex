@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { existsSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { createConfigStore } from './workspace/config'
@@ -43,6 +44,15 @@ app.whenReady().then(() => {
     const target = await workspace.resolveSkillPath(id)
     if (target) shell.showItemInFolder(target)
     return target !== null
+  })
+  ipcMain.handle('skilldex:pick-directory', async () => {
+    const parent = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+    const result = await dialog.showOpenDialog(parent, {
+      title: 'Choose a project folder',
+      properties: ['openDirectory', 'createDirectory'],
+    })
+    const picked = result.canceled ? undefined : result.filePaths[0]
+    return picked && existsSync(picked) ? picked : null
   })
   ipcMain.handle('skilldex:enable-skill', (_event, id: string) => workspace.enableSkill(id))
   ipcMain.handle('skilldex:disable-skill', (_event, id: string) => workspace.disableSkill(id))

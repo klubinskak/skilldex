@@ -59,6 +59,8 @@ export type WorkspaceSnapshot = {
   errors: string[]
   /** ISO timestamp of the scan. */
   scannedAt: string
+  /** Absolute home directory, so the renderer can tildify absolute paths. */
+  homeDir: string
 }
 
 export type WorkspaceConfig = {

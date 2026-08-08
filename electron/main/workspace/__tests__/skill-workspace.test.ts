@@ -63,6 +63,28 @@ describe('SkillWorkspace', () => {
     expect(snapshot.skills.find((s) => s.name === 'alpha')?.sourceRoot).toBe('~/.claude/skills')
   })
 
+  it('reports the home directory so the renderer can tildify paths', async () => {
+    const snapshot = await workspace.getSnapshot()
+    expect(snapshot.homeDir).toBe(home)
+  })
+
+  it('adds and removes a project root through configureSources', async () => {
+    const added = await workspace.configureSources({
+      includePersonal: false,
+      includePlugins: false,
+      projectRoots: [workspaceRoot],
+    })
+    expect(added.projects.map((p) => p.name)).toContain('proj1')
+
+    const removed = await workspace.configureSources({
+      includePersonal: false,
+      includePlugins: false,
+      projectRoots: [],
+    })
+    expect(removed.projects).toHaveLength(0)
+    expect(removed.skills).toHaveLength(0)
+  })
+
   it('includes project skills and records the project when configured', async () => {
     const snapshot = await workspace.configureSources({
       includePersonal: true,

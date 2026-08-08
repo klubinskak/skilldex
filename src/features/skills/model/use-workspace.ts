@@ -12,10 +12,12 @@ import {
 export type WorkspaceState = {
   skills: Skill[]
   snapshot: WorkspaceSnapshot
+  config: WorkspaceConfig | null
   loading: boolean
   error: string | null
   rescan: () => Promise<void>
   configure: (config: WorkspaceConfig) => Promise<void>
+  pickDirectory: () => Promise<string | null>
   getReadme: (id: string) => Promise<string | null>
   listFiles: (id: string) => Promise<SkillFile[] | null>
   reveal: (id: string) => Promise<boolean>
@@ -29,6 +31,7 @@ const bridge = () => (typeof window !== 'undefined' ? window.skilldex?.workspace
 
 export function useWorkspace(): WorkspaceState {
   const [snapshot, setSnapshot] = useState<WorkspaceSnapshot>(emptySnapshot)
+  const [config, setConfig] = useState<WorkspaceConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -51,6 +54,7 @@ export function useWorkspace(): WorkspaceState {
       setError('Skilldex must run in the desktop app to read your skills.')
       return
     }
+    void workspace.getConfig().then(setConfig)
     await run(() => workspace.getSnapshot())
   }, [run])
 
@@ -76,14 +80,24 @@ export function useWorkspace(): WorkspaceState {
     [],
   )
 
-  const configure = useCallback(
-    async (config: WorkspaceConfig) => {
-      const workspace = bridge()
-      if (!workspace) return
-      await run(() => workspace.configureSources(config))
-    },
-    [run],
-  )
+  const configure = useCallback(async (next: WorkspaceConfig) => {
+    const workspace = bridge()
+    if (!workspace) return
+    setLoading(true)
+    setError(null)
+    try {
+      setSnapshot(await workspace.configureSources(next))
+      setConfig(next) // only after the write succeeds, so state can't diverge
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause)
+      setError(message)
+      throw new Error(message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const pickDirectory = useCallback(() => bridge()?.pickDirectory() ?? Promise.resolve(null), [])
 
   const getReadme = useCallback((id: string) => bridge()?.getSkillReadme(id) ?? Promise.resolve(null), [])
   const listFiles = useCallback((id: string) => bridge()?.listSkillFiles(id) ?? Promise.resolve(null), [])
@@ -100,10 +114,12 @@ export function useWorkspace(): WorkspaceState {
   return {
     skills: snapshot.skills.map(toSkill),
     snapshot,
+    config,
     loading,
     error,
     rescan,
     configure,
+    pickDirectory,
     getReadme,
     listFiles,
     reveal,

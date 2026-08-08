@@ -13,6 +13,7 @@ type SidebarProps = {
   query: string
   onQuery: (value: string) => void
   onFilter: (key: FilterKey) => void
+  onOpenSettings: () => void
 }
 
 const NAV: Array<{ key: FilterKey; label: string; icon: ComponentType<{ className?: string }> }> = [
@@ -22,7 +23,7 @@ const NAV: Array<{ key: FilterKey; label: string; icon: ComponentType<{ classNam
   { key: 'project', label: 'Projects', icon: FolderGit2 },
 ]
 
-export function Sidebar({ active, counts, projects, query, onQuery, onFilter }: SidebarProps) {
+export function Sidebar({ active, counts, projects, query, onQuery, onFilter, onOpenSettings }: SidebarProps) {
   return (
     <aside className="flex w-[248px] shrink-0 flex-col border-r border-[#1c1c20] bg-[#0b0b0d] px-3 py-3.5">
       <div className="flex items-center gap-2.5 px-2 pb-3.5 pt-1.5">
@@ -79,7 +80,7 @@ export function Sidebar({ active, counts, projects, query, onQuery, onFilter }: 
       <div className="flex flex-col gap-0.5">
         {projects.length === 0 ? (
           <p className="px-2 text-[12px] leading-relaxed text-[#52525b]">
-            No project sources yet. Add a project folder to see it here.
+            No project sources yet. Add a project folder in Settings.
           </p>
         ) : (
           projects.map((project, index) => (
@@ -106,7 +107,14 @@ export function Sidebar({ active, counts, projects, query, onQuery, onFilter }: 
           <div className="text-[12.5px] font-medium text-[#e4e4e7]">Local machine</div>
           <div className="text-[11px] text-[#52525b]">Sign in coming soon</div>
         </div>
-        <Settings className="size-4 text-[#52525b]" />
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          aria-label="Settings"
+          className="grid size-7 place-items-center rounded-lg text-[#52525b] transition hover:bg-[#141417] hover:text-[#a1a1aa]"
+        >
+          <Settings className="size-4" />
+        </button>
       </div>
     </aside>
   )

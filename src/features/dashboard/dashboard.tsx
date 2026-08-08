@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { AlertCircle, ListFilter, Loader2, Plus, RefreshCw } from 'lucide-react'
 import { Sidebar, type FilterKey, type SidebarCounts } from '@/features/navigation/ui/sidebar'
+import { SettingsDialog } from '@/features/settings/ui/settings-dialog'
 import type { Skill } from '@/features/skills/model/skills'
 import { useWorkspace } from '@/features/skills/model/use-workspace'
 import { CreateSkillDialog } from '@/features/skills/ui/create-skill-dialog'
@@ -38,12 +39,28 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
 ]
 
 export function Dashboard() {
-  const { skills, snapshot, loading, error, rescan, getReadme, listFiles, reveal, enable, disable, remove, create } =
-    useWorkspace()
+  const {
+    skills,
+    snapshot,
+    config,
+    loading,
+    error,
+    rescan,
+    configure,
+    pickDirectory,
+    getReadme,
+    listFiles,
+    reveal,
+    enable,
+    disable,
+    remove,
+    create,
+  } = useWorkspace()
   const [filter, setFilter] = useState<FilterKey>('all')
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
   // Enabling/disabling moves a skill on disk, so its id changes. Re-select the
   // same skill (by name + kind) in the new snapshot so the detail view stays put.
@@ -92,7 +109,7 @@ export function Dashboard() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#09090b] text-[#fafafa]">
-      <Sidebar active={filter} counts={counts} projects={snapshot.projects} query={query} onQuery={setQuery} onFilter={(key) => { setFilter(key); setSelectedId(null) }} />
+      <Sidebar active={filter} counts={counts} projects={snapshot.projects} query={query} onQuery={setQuery} onFilter={(key) => { setFilter(key); setSelectedId(null) }} onOpenSettings={() => setShowSettings(true)} />
 
       <main className="relative flex min-w-0 flex-1 flex-col">
         {selected ? (
@@ -172,7 +189,11 @@ export function Dashboard() {
                 </div>
               ) : visibleSkills.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-[#27272a] px-6 py-14 text-center text-[13px] text-[#71717a]">
-                  {query ? `No skills match “${query}”.` : 'No skills found in this scope yet.'}
+                  {query
+                    ? `No skills match “${query}”.`
+                    : filter === 'project'
+                      ? 'No project skills yet. Add a project folder in Settings.'
+                      : 'No skills found in this scope yet.'}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-2">
@@ -198,6 +219,15 @@ export function Dashboard() {
         onCreate={async (input) => {
           await create(input)
         }}
+      />
+
+      <SettingsDialog
+        open={showSettings}
+        config={config}
+        homeDir={snapshot.homeDir}
+        onClose={() => setShowSettings(false)}
+        onConfigure={configure}
+        onPickDirectory={pickDirectory}
       />
     </div>
   )

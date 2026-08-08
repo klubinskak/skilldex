@@ -17,6 +17,7 @@ declare global {
         getSkillReadme(id: string): Promise<string | null>
         listSkillFiles(id: string): Promise<SkillFile[] | null>
         revealSkill(id: string): Promise<boolean>
+        pickDirectory(): Promise<string | null>
         enableSkill(id: string): Promise<WorkspaceSnapshot>
         disableSkill(id: string): Promise<WorkspaceSnapshot>
         removeSkill(id: string): Promise<WorkspaceSnapshot>

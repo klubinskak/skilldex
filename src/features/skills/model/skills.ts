@@ -45,6 +45,19 @@ export type WorkspaceSnapshot = {
   sources: SourceRecord[]
   errors: string[]
   scannedAt: string
+  homeDir: string
+}
+
+/**
+ * Replace a leading home directory with `~` for display. Renderer twin of the
+ * one in electron/main/workspace/filesystem-source.ts (the renderer can't import
+ * from main); kept in parity by skills.test.ts.
+ */
+export function tildify(target: string, homeDir: string): string {
+  if (target === homeDir) return '~'
+  if (!homeDir) return target
+  const prefix = homeDir.endsWith('/') ? homeDir : homeDir + '/'
+  return target.startsWith(prefix) ? '~/' + target.slice(prefix.length) : target
 }
 
 export type WorkspaceConfig = {
@@ -140,4 +153,5 @@ export const emptySnapshot: WorkspaceSnapshot = {
   sources: [],
   errors: [],
   scannedAt: '',
+  homeDir: '',
 }
