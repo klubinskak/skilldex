@@ -19,9 +19,9 @@ Deliver a local-first React + shadcn/ui dashboard that inventories agent skills 
 ## Technical shape
 
 - React, TypeScript, Tailwind, and shadcn/ui render the dashboard.
-- Tauri supplies the local filesystem and Git implementation.
-- `SkillWorkspace` is the core module. Its interface returns one normalized workspace snapshot and accepts configuration changes; discovery, parsing, Git inspection, deduplication, and errors stay behind that seam.
-- Local filesystem and Git access are internal adapters. Tests use fixture directories and a deterministic Git adapter rather than the host machine.
+- Electron hosts the app. The React + shadcn/ui renderer never receives Node.js access.
+- A context-isolated preload bridge exposes the `SkillWorkspace` module's two operations: read a normalized workspace snapshot and save configuration changes. Discovery, parsing, Git inspection, deduplication, and errors stay in the Electron main process behind that seam.
+- Local filesystem and Git access are internal main-process adapters. Tests use fixture directories and a deterministic Git adapter rather than the host machine.
 
 ## Delivery order
 
