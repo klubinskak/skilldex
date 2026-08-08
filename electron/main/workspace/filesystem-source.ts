@@ -209,10 +209,17 @@ export async function scanProjectSkills(projectRoots: string[], homeDir: string)
   return { skills, projects, errors }
 }
 
-/** A root is itself a project if it has `.claude/skills`; otherwise its children are. */
+/**
+ * Project directories under a picked root: the root itself if it has
+ * `.claude/skills`, PLUS every immediate child that has `.claude/skills`. These
+ * are not mutually exclusive — a folder can be its own project and a parent of
+ * others (e.g. `~/Desktop/coding` with shared skills and many sub-projects).
+ */
 async function projectDirsUnder(root: string): Promise<string[]> {
-  if (await exists(path.join(root, '.claude', 'skills'))) return [root]
-  return expandWorkspace(root)
+  const dirs: string[] = []
+  if (await exists(path.join(root, '.claude', 'skills'))) dirs.push(root)
+  dirs.push(...(await expandWorkspace(root)))
+  return dirs
 }
 
 async function expandWorkspace(root: string): Promise<string[]> {

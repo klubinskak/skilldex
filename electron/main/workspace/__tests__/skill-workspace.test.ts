@@ -85,6 +85,24 @@ describe('SkillWorkspace', () => {
     expect(removed.skills).toHaveLength(0)
   })
 
+  it('scans a workspace root that is itself a project AND its child projects', async () => {
+    // The picked folder has its own .claude/skills *and* child projects — both must show.
+    await writeSkill(path.join(workspaceRoot, '.claude', 'skills', 'root-skill'), 'root-skill', 'At the workspace root.')
+
+    const snapshot = await workspace.configureSources({
+      includePersonal: false,
+      includePlugins: false,
+      projectRoots: [workspaceRoot],
+    })
+
+    const projectNames = snapshot.projects.map((p) => p.name)
+    expect(projectNames).toContain('proj1') // child project
+    expect(projectNames).toContain(path.basename(workspaceRoot)) // the root itself
+    const skillNames = snapshot.skills.map((s) => s.name)
+    expect(skillNames).toContain('root-skill')
+    expect(skillNames).toContain('delta')
+  })
+
   it('includes project skills and records the project when configured', async () => {
     const snapshot = await workspace.configureSources({
       includePersonal: true,
