@@ -30,6 +30,11 @@ const HEADINGS: Record<FilterKey, { title: string; subtitle: string; pill: strin
     subtitle: 'Skills committed inside a project folder. They travel with the repo.',
     pill: 'In projects',
   },
+  disabled: {
+    title: 'Disabled Skills',
+    subtitle: 'Switched-off skills, parked on disk and hidden from Claude. Toggle one back on to restore it.',
+    pill: 'Switched off',
+  },
 }
 
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
@@ -37,6 +42,7 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: 'global', label: 'Global' },
   { key: 'plugin', label: 'Plugins' },
   { key: 'project', label: 'Project' },
+  { key: 'disabled', label: 'Disabled' },
 ]
 
 export function Dashboard() {
@@ -86,18 +92,26 @@ export function Dashboard() {
     }
   }
 
-  const counts: SidebarCounts = useMemo(
-    () => ({
-      all: skills.length,
-      global: skills.filter((skill) => skill.scope === 'global').length,
-      plugin: skills.filter((skill) => skill.scope === 'plugin').length,
-      project: skills.filter((skill) => skill.scope === 'project').length,
-    }),
-    [skills],
-  )
+  // Switched-off skills live only in the Disabled tab; the source tabs list the
+  // active library so a skill never shows up greyed-out in two places at once.
+  const counts: SidebarCounts = useMemo(() => {
+    const active = skills.filter((skill) => skill.enabled)
+    return {
+      all: active.length,
+      global: active.filter((skill) => skill.scope === 'global').length,
+      plugin: active.filter((skill) => skill.scope === 'plugin').length,
+      project: active.filter((skill) => skill.scope === 'project').length,
+      disabled: skills.filter((skill) => !skill.enabled).length,
+    }
+  }, [skills])
 
   const visibleSkills = useMemo(() => {
-    const scoped = filter === 'all' ? skills : skills.filter((skill) => skill.scope === filter)
+    const scoped =
+      filter === 'disabled'
+        ? skills.filter((skill) => !skill.enabled)
+        : filter === 'all'
+          ? skills.filter((skill) => skill.enabled)
+          : skills.filter((skill) => skill.enabled && skill.scope === filter)
     const value = query.trim().toLowerCase()
     if (!value) return scoped
     return scoped.filter((skill) =>
@@ -202,7 +216,9 @@ export function Dashboard() {
                     ? `No skills match “${query}”.`
                     : filter === 'project'
                       ? 'No project skills yet. Add a project folder in Settings.'
-                      : 'No skills found in this scope yet.'}
+                      : filter === 'disabled'
+                        ? 'No disabled skills. Everything is switched on.'
+                        : 'No skills found in this scope yet.'}
                 </div>
               ) : projectGroups && projectGroups.length > 0 ? (
                 <ProjectGroups

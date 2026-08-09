@@ -27,6 +27,31 @@ export function isDisabledPath(skillDir: string): boolean {
   return path.basename(path.dirname(skillDir)) === DISABLED_DIR
 }
 
+/**
+ * Move a skill entry from `src` to `dest`. A plain `fs.rename` is wrong for a
+ * symlinked skill: enabling/disabling moves it between `<root>/` and
+ * `<root>/.disabled/`, which changes the entry's depth, so a *relative* link
+ * target that resolved from the old location no longer resolves from the new one
+ * (it silently breaks and the skill vanishes from scans). Recreate the link
+ * instead — recompute a relative target from the destination, leave absolute
+ * targets untouched — so the link keeps pointing at the same real skill.
+ */
+async function moveSkillEntry(src: string, dest: string): Promise<void> {
+  const info = await fs.lstat(src)
+  if (!info.isSymbolicLink()) {
+    await fs.rename(src, dest)
+    return
+  }
+  const rawTarget = await fs.readlink(src)
+  if (path.isAbsolute(rawTarget)) {
+    await fs.symlink(rawTarget, dest)
+  } else {
+    const absoluteTarget = path.resolve(path.dirname(src), rawTarget)
+    await fs.symlink(path.relative(path.dirname(dest), absoluteTarget), dest)
+  }
+  await fs.unlink(src)
+}
+
 /** Move `<root>/<name>` → `<root>/.disabled/<name>`. Returns the new path. */
 export async function disableSkillDir(skillDir: string): Promise<string> {
   const root = path.dirname(skillDir)
@@ -35,7 +60,7 @@ export async function disableSkillDir(skillDir: string): Promise<string> {
   const dest = path.join(disabledRoot, name)
   await fs.mkdir(disabledRoot, { recursive: true })
   await assertMissing(dest)
-  await fs.rename(skillDir, dest)
+  await moveSkillEntry(skillDir, dest)
   return dest
 }
 
@@ -45,7 +70,7 @@ export async function enableSkillDir(skillDir: string): Promise<string> {
   const name = path.basename(skillDir)
   const dest = path.join(root, name)
   await assertMissing(dest)
-  await fs.rename(skillDir, dest)
+  await moveSkillEntry(skillDir, dest)
   return dest
 }
 

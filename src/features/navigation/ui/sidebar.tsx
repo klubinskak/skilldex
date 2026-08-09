@@ -1,8 +1,8 @@
-import { Blocks, Boxes, FolderGit2, Globe, LayoutGrid, Monitor, Search, Settings } from 'lucide-react'
+import { Blocks, Boxes, FolderGit2, Globe, LayoutGrid, Monitor, PowerOff, Search, Settings } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { ACCENT_PALETTE, type ProjectRecord } from '@/features/skills/model/skills'
 
-export type FilterKey = 'all' | 'global' | 'plugin' | 'project'
+export type FilterKey = 'all' | 'global' | 'plugin' | 'project' | 'disabled'
 
 export type SidebarCounts = Record<FilterKey, number>
 
@@ -21,13 +21,14 @@ const NAV: Array<{ key: FilterKey; label: string; icon: ComponentType<{ classNam
   { key: 'global', label: 'Global', icon: Globe },
   { key: 'plugin', label: 'Plugins', icon: Blocks },
   { key: 'project', label: 'Projects', icon: FolderGit2 },
+  { key: 'disabled', label: 'Disabled', icon: PowerOff },
 ]
 
 export function Sidebar({ active, counts, projects, query, onQuery, onFilter, onOpenSettings }: SidebarProps) {
   return (
     <aside className="flex w-[248px] shrink-0 flex-col border-r border-[#1c1c20] bg-[#0b0b0d] px-3 py-3.5">
       <div className="flex items-center gap-2.5 px-2 pb-3.5 pt-1.5">
-        <div className="grid size-[30px] place-items-center rounded-[9px] bg-gradient-to-br from-[#f97316] to-[#ea580c] shadow-[0_4px_14px_-2px_rgba(249,115,22,.5)]">
+        <div className="grid size-[30px] place-items-center rounded-[9px] border border-[#27272a] bg-gradient-to-br from-[#1c1c1f] to-[#0a0a0b] shadow-[0_4px_14px_-2px_rgba(0,0,0,.5)]">
           <Boxes className="size-[17px] text-white" />
         </div>
         <span className="text-[15.5px] font-semibold tracking-tight text-[#fafafa]">Skilldex</span>
