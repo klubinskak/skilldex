@@ -1,8 +1,12 @@
 {
   "name": "skilldex",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "main": "./out/main/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/klubinskak/skilldex.git"
+  },
   "scripts": {
     "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build",
@@ -10,7 +14,8 @@
     "test": "vitest run",
     "lint": "oxlint",
     "preview": "electron-vite preview",
-    "package": "npm run build && electron-builder"
+    "package": "npm run build && electron-builder",
+    "release": "npm run build && electron-builder --publish always"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -52,8 +57,32 @@
       "out/**/*",
       "package.json"
     ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "klubinskak",
+        "repo": "skilldex"
+      }
+    ],
     "mac": {
-      "target": "dmg"
+      "target": [
+        {
+          "target": "dmg",
+          "arch": "universal"
+        }
+      ],
+      "artifactName": "Skilldex-mac.${ext}",
+      "icon": "build/icon.icns",
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "build/icon.png",
+      "category": "Development"
     }
   }
 }
