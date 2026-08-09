@@ -1,0 +1,42 @@
+name: Release
+
+# Build the desktop app for macOS, Windows, and Linux and publish the installers
+# to a GitHub Release. Triggered by pushing a version tag (e.g. `v0.1.0`), or run
+# manually. electron-builder uploads to a *draft* release by default — review it
+# on the Releases page and click "Publish release" to make the downloads live
+# (that's what the marketing site's `/releases/latest` button points at).
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write # needed to create the release and upload assets
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and publish
+        run: npm run release
+        env:
+          # electron-builder reads this to create the release and upload assets.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
