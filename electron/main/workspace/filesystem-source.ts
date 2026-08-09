@@ -124,6 +124,8 @@ async function readSkill(skillDir: string, ctx: ReadContext): Promise<SkillRecor
     sourceRoot: tildify(ctx.sourceRoot, ctx.homeDir),
     displayPath: tildify(realPath, ctx.homeDir),
     enabled: ctx.enabled,
+    // Favourite state lives in config, not on disk; SkillWorkspace stamps it.
+    isFavourite: false,
     isSymlink,
     fileCount,
     projects: ctx.projects,

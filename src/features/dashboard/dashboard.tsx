@@ -15,6 +15,11 @@ const HEADINGS: Record<FilterKey, { title: string; subtitle: string; pill: strin
     subtitle: 'Every agent skill available on this machine and in your open projects.',
     pill: 'All sources',
   },
+  favourites: {
+    title: 'Favourites',
+    subtitle: 'Skills you have starred. Enabled or not, they live here for quick access.',
+    pill: 'Starred',
+  },
   global: {
     title: 'Global Skills',
     subtitle: 'Personal skills installed on this machine. Available to every project you open.',
@@ -30,13 +35,20 @@ const HEADINGS: Record<FilterKey, { title: string; subtitle: string; pill: strin
     subtitle: 'Skills committed inside a project folder. They travel with the repo.',
     pill: 'In projects',
   },
+  disabled: {
+    title: 'Disabled Skills',
+    subtitle: 'Switched-off skills, parked on disk and hidden from Claude. Toggle one back on to restore it.',
+    pill: 'Switched off',
+  },
 }
 
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: 'all', label: 'All' },
+  { key: 'favourites', label: 'Favourites' },
   { key: 'global', label: 'Global' },
   { key: 'plugin', label: 'Plugins' },
   { key: 'project', label: 'Project' },
+  { key: 'disabled', label: 'Disabled' },
 ]
 
 export function Dashboard() {
@@ -55,6 +67,7 @@ export function Dashboard() {
     enable,
     disable,
     remove,
+    toggleFavourite,
     create,
   } = useWorkspace()
   const [filter, setFilter] = useState<FilterKey>('all')
@@ -86,18 +99,36 @@ export function Dashboard() {
     }
   }
 
-  const counts: SidebarCounts = useMemo(
-    () => ({
-      all: skills.length,
-      global: skills.filter((skill) => skill.scope === 'global').length,
-      plugin: skills.filter((skill) => skill.scope === 'plugin').length,
-      project: skills.filter((skill) => skill.scope === 'project').length,
-    }),
-    [skills],
-  )
+  const favourite = (skill: Skill) => {
+    // Favouriting never moves the skill on disk, so its id (and any selection)
+    // stays valid — no re-selection dance needed.
+    void toggleFavourite(skill.id)
+  }
+
+  // Switched-off skills live only in the Disabled tab; the source tabs list the
+  // active library so a skill never shows up greyed-out in two places at once.
+  const counts: SidebarCounts = useMemo(() => {
+    const active = skills.filter((skill) => skill.enabled)
+    return {
+      all: active.length,
+      // Favourites are shown regardless of enabled state (Q7), so count them all.
+      favourites: skills.filter((skill) => skill.isFavourite).length,
+      global: active.filter((skill) => skill.scope === 'global').length,
+      plugin: active.filter((skill) => skill.scope === 'plugin').length,
+      project: active.filter((skill) => skill.scope === 'project').length,
+      disabled: skills.filter((skill) => !skill.enabled).length,
+    }
+  }, [skills])
 
   const visibleSkills = useMemo(() => {
-    const scoped = filter === 'all' ? skills : skills.filter((skill) => skill.scope === filter)
+    const scoped =
+      filter === 'disabled'
+        ? skills.filter((skill) => !skill.enabled)
+        : filter === 'favourites'
+          ? skills.filter((skill) => skill.isFavourite)
+          : filter === 'all'
+            ? skills.filter((skill) => skill.enabled)
+            : skills.filter((skill) => skill.enabled && skill.scope === filter)
     const value = query.trim().toLowerCase()
     if (!value) return scoped
     return scoped.filter((skill) =>
@@ -128,6 +159,7 @@ export function Dashboard() {
             listFiles={listFiles}
             reveal={reveal}
             onToggle={() => void toggleSkill(selected)}
+            onToggleFavourite={() => favourite(selected)}
             onRemove={() => void removeSkill(selected.id)}
             onBack={() => setSelectedId(null)}
           />
@@ -202,13 +234,18 @@ export function Dashboard() {
                     ? `No skills match “${query}”.`
                     : filter === 'project'
                       ? 'No project skills yet. Add a project folder in Settings.'
-                      : 'No skills found in this scope yet.'}
+                      : filter === 'disabled'
+                        ? 'No disabled skills. Everything is switched on.'
+                        : filter === 'favourites'
+                          ? 'No favourites yet. Tap the heart on any skill to star it.'
+                          : 'No skills found in this scope yet.'}
                 </div>
               ) : projectGroups && projectGroups.length > 0 ? (
                 <ProjectGroups
                   groups={projectGroups}
                   onOpen={(id) => setSelectedId(id)}
                   onToggle={(skill) => void toggleSkill(skill)}
+                  onToggleFavourite={(skill) => favourite(skill)}
                 />
               ) : (
                 <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-2">
@@ -218,6 +255,7 @@ export function Dashboard() {
                       skill={skill}
                       onOpen={() => setSelectedId(skill.id)}
                       onToggle={() => void toggleSkill(skill)}
+                      onToggleFavourite={() => favourite(skill)}
                     />
                   ))}
                 </div>

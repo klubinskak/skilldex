@@ -8,9 +8,10 @@ type ProjectGroupsProps = {
   groups: ProjectGroup[]
   onOpen: (id: string) => void
   onToggle: (skill: Skill) => void
+  onToggleFavourite: (skill: Skill) => void
 }
 
-export function ProjectGroups({ groups, onOpen, onToggle }: ProjectGroupsProps) {
+export function ProjectGroups({ groups, onOpen, onToggle, onToggleFavourite }: ProjectGroupsProps) {
   return (
     <div className="flex flex-col gap-9">
       {groups.map(({ project, skills }) => (
@@ -30,6 +31,7 @@ export function ProjectGroups({ groups, onOpen, onToggle }: ProjectGroupsProps) 
                 skill={skill}
                 onOpen={() => onOpen(skill.id)}
                 onToggle={() => onToggle(skill)}
+                onToggleFavourite={() => onToggleFavourite(skill)}
               />
             ))}
           </div>

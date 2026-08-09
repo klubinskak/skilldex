@@ -52,6 +52,28 @@ describe('disable/enable', () => {
     expect(enabled).toBe(skill)
     expect(await exists(path.join(skill, 'SKILL.md'))).toBe(true)
   })
+
+  it('keeps a relative symlinked skill resolvable through disable and enable', async () => {
+    // Real skill lives outside the skills root; the skill entry is a *relative*
+    // symlink into it (the .agents/ layout that broke before this fix).
+    const target = path.join(root, 'store', 'gamma')
+    await makeSkill(target)
+    const skillsRoot = path.join(root, 'skills')
+    await fs.mkdir(skillsRoot, { recursive: true })
+    const link = path.join(skillsRoot, 'gamma')
+    await fs.symlink(path.relative(skillsRoot, target), link)
+
+    const disabled = await disableSkillDir(link)
+    // Still a symlink (not a copied dir) and still resolves to the real SKILL.md.
+    expect((await fs.lstat(disabled)).isSymbolicLink()).toBe(true)
+    expect(await exists(path.join(disabled, 'SKILL.md'))).toBe(true)
+
+    const enabled = await enableSkillDir(disabled)
+    expect((await fs.lstat(enabled)).isSymbolicLink()).toBe(true)
+    expect(await exists(path.join(enabled, 'SKILL.md'))).toBe(true)
+    // The real skill was never touched.
+    expect(await exists(path.join(target, 'SKILL.md'))).toBe(true)
+  })
 })
 
 describe('removeSkillDir', () => {

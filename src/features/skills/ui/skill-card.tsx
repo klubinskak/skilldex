@@ -1,10 +1,16 @@
 import { FileText } from 'lucide-react'
 import { scopePillClass, type Skill } from '../model/skills'
+import { FavouriteButton } from './favourite-button'
 import { SkillToggle } from './skill-toggle'
 
-type SkillCardProps = { skill: Skill; onOpen: () => void; onToggle: () => void }
+type SkillCardProps = {
+  skill: Skill
+  onOpen: () => void
+  onToggle: () => void
+  onToggleFavourite: () => void
+}
 
-export function SkillCard({ skill, onOpen, onToggle }: SkillCardProps) {
+export function SkillCard({ skill, onOpen, onToggle, onToggleFavourite }: SkillCardProps) {
   const chips = skill.scope === 'project' ? skill.projects.slice(0, 2) : []
 
   return (
@@ -38,7 +44,8 @@ export function SkillCard({ skill, onOpen, onToggle }: SkillCardProps) {
           </div>
           <div className="mt-0.5 truncate font-mono text-[11px] text-[#52525b]">{skill.source}</div>
         </div>
-        <span className="mt-1 shrink-0">
+        <span className="mt-0.5 flex shrink-0 items-center gap-1.5">
+          <FavouriteButton favourite={skill.isFavourite} onToggle={onToggleFavourite} />
           <SkillToggle enabled={skill.enabled} onToggle={onToggle} disabled={skill.scope === 'plugin'} />
         </span>
       </div>

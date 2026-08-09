@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, Check, Copy, ExternalLink, FolderOpen, Loader2, Pencil } from 'lucide-react'
 import { scopePillClass, type Skill, type SkillFile } from '../model/skills'
+import { FavouriteButton } from './favourite-button'
 import { SkillToggle } from './skill-toggle'
 
 type SkillDetailProps = {
@@ -9,6 +10,7 @@ type SkillDetailProps = {
   listFiles: (id: string) => Promise<SkillFile[] | null>
   reveal: (id: string) => Promise<boolean>
   onToggle: () => void
+  onToggleFavourite: () => void
   onRemove: () => void
   onBack: () => void
 }
@@ -21,7 +23,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export function SkillDetail({ skill, getReadme, listFiles, reveal, onToggle, onRemove, onBack }: SkillDetailProps) {
+export function SkillDetail({ skill, getReadme, listFiles, reveal, onToggle, onToggleFavourite, onRemove, onBack }: SkillDetailProps) {
   const [tab, setTab] = useState<Tab>('instructions')
   const [readme, setReadme] = useState<string | null>(null)
   const [files, setFiles] = useState<SkillFile[] | null>(null)
@@ -93,15 +95,20 @@ export function SkillDetail({ skill, getReadme, listFiles, reveal, onToggle, onR
             </div>
             <p className="mt-1.5 max-w-[620px] text-[14px] leading-relaxed text-[#a1a1aa]">{skill.summary}</p>
           </div>
-          <button
-            type="button"
-            disabled
-            title="Editing skills is coming soon"
-            className="flex h-9 shrink-0 cursor-not-allowed items-center gap-1.5 rounded-[9px] border border-[#27272a] bg-[#18181b] px-3.5 text-[12.5px] font-medium text-[#e4e4e7] opacity-60"
-          >
-            <Pencil className="size-3.5" />
-            Edit
-          </button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="grid h-9 w-9 place-items-center rounded-[9px] border border-[#27272a] bg-[#18181b]">
+              <FavouriteButton favourite={skill.isFavourite} size="lg" onToggle={onToggleFavourite} />
+            </span>
+            <button
+              type="button"
+              disabled
+              title="Editing skills is coming soon"
+              className="flex h-9 cursor-not-allowed items-center gap-1.5 rounded-[9px] border border-[#27272a] bg-[#18181b] px-3.5 text-[12.5px] font-medium text-[#e4e4e7] opacity-60"
+            >
+              <Pencil className="size-3.5" />
+              Edit
+            </button>
+          </div>
         </div>
 
         <div className="mt-5 flex gap-2 border-b border-[#1c1c20]">
