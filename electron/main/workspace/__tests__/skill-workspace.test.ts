@@ -136,6 +136,56 @@ describe('SkillWorkspace', () => {
     expect(snapshot.skills.find((s) => s.name === 'alpha')?.fileCount).toBeGreaterThanOrEqual(1)
   })
 
+  it('resolves a personal skill origin from the .skill-lock.json manifest', async () => {
+    await fs.mkdir(path.join(home, '.agents'), { recursive: true })
+    await fs.writeFile(
+      path.join(home, '.agents', '.skill-lock.json'),
+      JSON.stringify({
+        version: 3,
+        skills: {
+          alpha: {
+            source: 'acme/skills',
+            sourceUrl: 'https://github.com/acme/skills.git',
+            skillPath: 'skills/alpha/SKILL.md',
+          },
+        },
+      }),
+    )
+
+    const snapshot = await workspace.getSnapshot()
+    const alpha = snapshot.skills.find((s) => s.name === 'alpha')
+    expect(alpha?.origin).toEqual({
+      host: 'github',
+      label: 'acme/skills',
+      repoUrl: 'https://github.com/acme/skills',
+      webUrl: 'https://github.com/acme/skills/tree/HEAD/skills/alpha',
+    })
+    // A personal skill absent from the lock has no origin.
+    expect(snapshot.skills.find((s) => s.name === 'beta')?.origin).toBeUndefined()
+  })
+
+  it('resolves a project skill origin from the enclosing .git clone', async () => {
+    const gitDir = path.join(workspaceRoot, 'proj1', '.git')
+    await fs.mkdir(gitDir, { recursive: true })
+    await fs.writeFile(
+      path.join(gitDir, 'config'),
+      '[remote "origin"]\n\turl = git@github.com:klubinskak/flipsy.git\n',
+    )
+    await fs.writeFile(path.join(gitDir, 'HEAD'), 'ref: refs/heads/main\n')
+
+    const snapshot = await workspace.configureSources({
+      includePersonal: false,
+      includePlugins: false,
+      projectRoots: [workspaceRoot],
+    })
+    expect(snapshot.skills.find((s) => s.name === 'delta')?.origin).toEqual({
+      host: 'github',
+      label: 'klubinskak/flipsy',
+      repoUrl: 'https://github.com/klubinskak/flipsy',
+      webUrl: 'https://github.com/klubinskak/flipsy/tree/main/.claude/skills/delta',
+    })
+  })
+
   it('returns SKILL.md content only for a known skill id', async () => {
     const snapshot = await workspace.getSnapshot()
     const alpha = snapshot.skills.find((s) => s.name === 'alpha')!

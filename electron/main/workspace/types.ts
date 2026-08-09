@@ -28,12 +28,32 @@ export type SkillRecord = {
   fileCount: number
   /** Project names that reference this skill (Project skills only). */
   projects: string[]
+  /** Upstream provenance, when the skill's manifest records where it came from. */
+  origin?: SkillOrigin
 }
 
 export type SkillFile = {
   /** Path relative to the skill directory, e.g. `SKILL.md` or `scripts/run.sh`. */
   relativePath: string
   sizeBytes: number
+}
+
+/** Which git host a skill's upstream lives on (drives the deep-link URL shape). */
+export type OriginHost = 'github' | 'gitlab' | 'bitbucket' | 'other'
+
+/**
+ * Where a skill came from — resolved from the manifest that records provenance
+ * for its source kind (personal → `.skill-lock.json`, plugin → `marketplace.json`,
+ * project → `.git/config`). Absent on locally-authored skills with no upstream.
+ */
+export type SkillOrigin = {
+  host: OriginHost
+  /** Human label, e.g. `vercel-labs/skills`. */
+  label: string
+  /** Browsable repository root, e.g. `https://github.com/vercel-labs/skills`. */
+  repoUrl: string
+  /** Deep link to this skill's folder within the repo, e.g. `.../tree/HEAD/skills/find-skills`. */
+  webUrl: string
 }
 
 export type ProjectRecord = {

@@ -6,6 +6,15 @@
 
 export type SkillSourceKind = 'Personal' | 'Plugin' | 'Project'
 
+export type OriginHost = 'github' | 'gitlab' | 'bitbucket' | 'other'
+
+export type SkillOrigin = {
+  host: OriginHost
+  label: string
+  repoUrl: string
+  webUrl: string
+}
+
 export type SkillRecord = {
   id: string
   name: string
@@ -19,6 +28,7 @@ export type SkillRecord = {
   isSymlink: boolean
   fileCount: number
   projects: string[]
+  origin?: SkillOrigin
 }
 
 export type SkillFile = {

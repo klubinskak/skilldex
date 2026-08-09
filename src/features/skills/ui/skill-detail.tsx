@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, FolderOpen, Loader2, Pencil } from 'lucide-react'
+import { ArrowLeft, Check, Copy, ExternalLink, FolderOpen, Loader2, Pencil } from 'lucide-react'
 import { scopePillClass, type Skill, type SkillFile } from '../model/skills'
 import { SkillToggle } from './skill-toggle'
 
@@ -27,7 +27,16 @@ export function SkillDetail({ skill, getReadme, listFiles, reveal, onToggle, onR
   const [files, setFiles] = useState<SkillFile[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [confirmingRemove, setConfirmingRemove] = useState(false)
+  const [copied, setCopied] = useState(false)
   const manageable = skill.scope !== 'plugin'
+
+  const copyOrigin = () => {
+    if (!skill.origin) return
+    void navigator.clipboard.writeText(skill.origin.webUrl).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
 
   useEffect(() => {
     let active = true
@@ -180,6 +189,31 @@ export function SkillDetail({ skill, getReadme, listFiles, reveal, onToggle, onR
         <div className="break-all rounded-[9px] border border-[#1c1c20] bg-[#0c0c0e] px-3 py-2.5 font-mono text-[11.5px] leading-relaxed text-[#a1a1aa]">
           {skill.source}
         </div>
+
+        {skill.origin && (
+          <>
+            <div className="mb-2.5 mt-5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#52525b]">
+              Source
+            </div>
+            <div className="rounded-[9px] border border-[#1c1c20] bg-[#0c0c0e] px-3 py-2.5">
+              <div className="flex items-center gap-1.5 text-[12.5px] text-[#e4e4e7]">
+                <ExternalLink className="size-3.5 shrink-0 text-[#71717a]" />
+                <span className="truncate font-medium">{skill.origin.label}</span>
+              </div>
+              <div className="mt-1.5 break-all font-mono text-[11px] leading-relaxed text-[#71717a]">
+                {skill.origin.webUrl}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={copyOrigin}
+              className="mt-2 flex h-9 w-full items-center justify-center gap-1.5 rounded-[9px] border border-[#27272a] bg-[#18181b] text-[12.5px] font-medium text-[#e4e4e7] transition hover:border-[#3a3a42]"
+            >
+              {copied ? <Check className="size-3.5 text-[#22c55e]" /> : <Copy className="size-3.5" />}
+              {copied ? 'Copied' : 'Copy link'}
+            </button>
+          </>
+        )}
 
         <button
           type="button"
