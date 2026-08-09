@@ -73,6 +73,7 @@ describe('SkillWorkspace', () => {
       includePersonal: false,
       includePlugins: false,
       projectRoots: [workspaceRoot],
+      favourites: [],
     })
     expect(added.projects.map((p) => p.name)).toContain('proj1')
 
@@ -80,6 +81,7 @@ describe('SkillWorkspace', () => {
       includePersonal: false,
       includePlugins: false,
       projectRoots: [],
+      favourites: [],
     })
     expect(removed.projects).toHaveLength(0)
     expect(removed.skills).toHaveLength(0)
@@ -93,6 +95,7 @@ describe('SkillWorkspace', () => {
       includePersonal: false,
       includePlugins: false,
       projectRoots: [workspaceRoot],
+      favourites: [],
     })
 
     const projectNames = snapshot.projects.map((p) => p.name)
@@ -108,6 +111,7 @@ describe('SkillWorkspace', () => {
       includePersonal: true,
       includePlugins: true,
       projectRoots: [workspaceRoot],
+      favourites: [],
     })
     expect(snapshot.projects.map((p) => p.name)).toContain('proj1')
     expect(snapshot.skills.find((s) => s.name === 'delta')?.sourceKind).toBe('Project')
@@ -118,6 +122,7 @@ describe('SkillWorkspace', () => {
       includePersonal: true,
       includePlugins: false,
       projectRoots: [workspaceRoot],
+      favourites: [],
     })
     const shared = snapshot.skills.filter((s) => s.name === 'shared')
     expect(shared).toHaveLength(1)
@@ -126,7 +131,7 @@ describe('SkillWorkspace', () => {
   })
 
   it('persists configuration across workspace reads', async () => {
-    await workspace.configureSources({ includePersonal: false, includePlugins: false, projectRoots: [workspaceRoot] })
+    await workspace.configureSources({ includePersonal: false, includePlugins: false, projectRoots: [workspaceRoot], favourites: [] })
     const snapshot = await workspace.getSnapshot()
     expect(snapshot.skills.every((s) => s.sourceKind === 'Project')).toBe(true)
   })
@@ -186,7 +191,7 @@ describe('SkillWorkspace', () => {
     })
 
     it('creates a project skill in the named project', async () => {
-      await workspace.configureSources({ includePersonal: false, includePlugins: false, projectRoots: [workspaceRoot] })
+      await workspace.configureSources({ includePersonal: false, includePlugins: false, projectRoots: [workspaceRoot], favourites: [] })
       const after = await workspace.createSkill({
         name: 'Proj Skill',
         description: 'scoped',
@@ -201,6 +206,59 @@ describe('SkillWorkspace', () => {
     it('rejects a duplicate skill name', async () => {
       await workspace.createSkill({ name: 'dupe', description: '', scope: 'global' })
       await expect(workspace.createSkill({ name: 'dupe', description: '', scope: 'global' })).rejects.toThrow(/exists/i)
+    })
+  })
+
+  describe('favourites', () => {
+    it('toggles a skill on and off', async () => {
+      const before = await workspace.getSnapshot()
+      const alpha = before.skills.find((s) => s.name === 'alpha')!
+      expect(alpha.isFavourite).toBe(false)
+
+      const on = await workspace.toggleFavourite(alpha.id)
+      expect(on.skills.find((s) => s.name === 'alpha')!.isFavourite).toBe(true)
+
+      const off = await workspace.toggleFavourite(alpha.id)
+      expect(off.skills.find((s) => s.name === 'alpha')!.isFavourite).toBe(false)
+    })
+
+    it('persists a favourite across snapshot reads', async () => {
+      const before = await workspace.getSnapshot()
+      const alpha = before.skills.find((s) => s.name === 'alpha')!
+      await workspace.toggleFavourite(alpha.id)
+
+      const reread = await workspace.getSnapshot()
+      expect(reread.skills.find((s) => s.name === 'alpha')!.isFavourite).toBe(true)
+    })
+
+    it('keeps a favourite through disable and re-enable', async () => {
+      const before = await workspace.getSnapshot()
+      const alpha = before.skills.find((s) => s.name === 'alpha')!
+      await workspace.toggleFavourite(alpha.id)
+
+      const disabled = await workspace.disableSkill(alpha.id)
+      const off = disabled.skills.find((s) => s.name === 'alpha')!
+      expect(off.isFavourite).toBe(true) // heart survives the .disabled/ move
+
+      const enabled = await workspace.enableSkill(off.id)
+      expect(enabled.skills.find((s) => s.name === 'alpha')!.isFavourite).toBe(true)
+    })
+
+    it('can favourite a plugin skill (favourites are not management)', async () => {
+      const before = await workspace.getSnapshot()
+      const gamma = before.skills.find((s) => s.name === 'gamma')!
+      const after = await workspace.toggleFavourite(gamma.id)
+      expect(after.skills.find((s) => s.name === 'gamma')!.isFavourite).toBe(true)
+    })
+
+    it('prunes a favourite when the skill is uninstalled', async () => {
+      const before = await workspace.getSnapshot()
+      const beta = before.skills.find((s) => s.name === 'beta')!
+      await workspace.toggleFavourite(beta.id)
+      expect((await workspace.getConfig()).favourites).toHaveLength(1)
+
+      await workspace.removeSkill(beta.id)
+      expect((await workspace.getConfig()).favourites).toEqual([])
     })
   })
 })

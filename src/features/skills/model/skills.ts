@@ -16,6 +16,7 @@ export type SkillRecord = {
   sourceRoot: string
   displayPath: string
   enabled: boolean
+  isFavourite: boolean
   isSymlink: boolean
   fileCount: number
   projects: string[]
@@ -64,6 +65,7 @@ export type WorkspaceConfig = {
   includePersonal: boolean
   includePlugins: boolean
   projectRoots: string[]
+  favourites: string[]
 }
 
 export type CreateSkillInput = {

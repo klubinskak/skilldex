@@ -23,6 +23,8 @@ export type SkillRecord = {
   /** Display-friendly full path to this skill's directory, e.g. `~/.claude/skills/tdd`. */
   displayPath: string
   enabled: boolean
+  /** Whether the user has favourited this skill (persisted in config). */
+  isFavourite: boolean
   isSymlink: boolean
   /** Number of files inside the skill directory. */
   fileCount: number
@@ -72,6 +74,11 @@ export type WorkspaceConfig = {
    * children are projects.
    */
   projectRoots: string[]
+  /**
+   * Favourited skills, stored as `.disabled/`-normalized real paths (see
+   * favourite-key.ts) so a favourite survives a skill being enabled/disabled.
+   */
+  favourites: string[]
 }
 
 export type CreateSkillInput = {
@@ -86,4 +93,5 @@ export const defaultConfig: WorkspaceConfig = {
   includePersonal: true,
   includePlugins: true,
   projectRoots: [],
+  favourites: [],
 }

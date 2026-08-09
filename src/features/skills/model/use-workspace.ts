@@ -24,6 +24,7 @@ export type WorkspaceState = {
   enable: (id: string) => Promise<WorkspaceSnapshot | null>
   disable: (id: string) => Promise<WorkspaceSnapshot | null>
   remove: (id: string) => Promise<WorkspaceSnapshot | null>
+  toggleFavourite: (id: string) => Promise<WorkspaceSnapshot | null>
   create: (input: CreateSkillInput) => Promise<WorkspaceSnapshot | null>
 }
 
@@ -105,6 +106,7 @@ export function useWorkspace(): WorkspaceState {
   const enable = useCallback((id: string) => mutate((w) => w.enableSkill(id)), [mutate])
   const disable = useCallback((id: string) => mutate((w) => w.disableSkill(id)), [mutate])
   const remove = useCallback((id: string) => mutate((w) => w.removeSkill(id)), [mutate])
+  const toggleFavourite = useCallback((id: string) => mutate((w) => w.toggleFavourite(id)), [mutate])
   const create = useCallback((input: CreateSkillInput) => mutate((w) => w.createSkill(input)), [mutate])
 
   useEffect(() => {
@@ -126,6 +128,7 @@ export function useWorkspace(): WorkspaceState {
     enable,
     disable,
     remove,
+    toggleFavourite,
     create,
   }
 }

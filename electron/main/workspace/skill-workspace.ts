@@ -10,6 +10,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { ConfigStore } from './config'
+import { favouriteKeyFor } from './favourite-key'
 import {
   listSkillFiles,
   resolveProjectDirs,
@@ -53,6 +54,8 @@ export type SkillWorkspace = {
   disableSkill(id: string): Promise<WorkspaceSnapshot>
   /** Delete a skill from disk (destructive). Returns the fresh snapshot. */
   removeSkill(id: string): Promise<WorkspaceSnapshot>
+  /** Flip a skill's favourite state (persisted in config). Returns the fresh snapshot. */
+  toggleFavourite(id: string): Promise<WorkspaceSnapshot>
   /** Scaffold a new skill folder with a SKILL.md. Returns the fresh snapshot. */
   createSkill(input: CreateSkillInput): Promise<WorkspaceSnapshot>
 }
@@ -100,7 +103,11 @@ export function createSkillWorkspace({ homeDir, configStore }: SkillWorkspaceDep
     errors.push(...projectScan.errors)
     collected.push(...projectScan.skills)
 
-    const skills = dedupe(collected)
+    const favourites = new Set(config.favourites)
+    const skills = dedupe(collected).map((skill) => ({
+      ...skill,
+      isFavourite: favourites.has(favouriteKeyFor(skill.realPath)),
+    }))
 
     known.clear()
     for (const skill of skills) known.set(skill.id, skill)
@@ -163,7 +170,26 @@ export function createSkillWorkspace({ homeDir, configStore }: SkillWorkspaceDep
       const skill = await resolveKnown(id)
       assertManageable(skill)
       await removeSkillDir(skill.path)
-      return buildSnapshot(await configStore.load())
+      // A deleted skill can't stay favourited — prune its key so the set never
+      // accumulates dead entries.
+      const config = await configStore.load()
+      const key = favouriteKeyFor(skill.realPath)
+      const saved = config.favourites.includes(key)
+        ? await configStore.save({ ...config, favourites: config.favourites.filter((k) => k !== key) })
+        : config
+      return buildSnapshot(saved)
+    },
+
+    async toggleFavourite(id) {
+      const skill = await resolveKnown(id)
+      if (!skill) throw new Error('Unknown skill.')
+      const config = await configStore.load()
+      const key = favouriteKeyFor(skill.realPath)
+      const favourites = config.favourites.includes(key)
+        ? config.favourites.filter((k) => k !== key)
+        : [...config.favourites, key]
+      const saved = await configStore.save({ ...config, favourites })
+      return buildSnapshot(saved)
     },
 
     async createSkill(input) {

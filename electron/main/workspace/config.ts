@@ -25,7 +25,12 @@ export function createConfigStore(filePath: string): ConfigStore {
     async save(config) {
       const normalized = normalize(config)
       await fs.mkdir(path.dirname(filePath), { recursive: true })
-      await fs.writeFile(filePath, JSON.stringify(normalized, null, 2), 'utf8')
+      // Write to a temp file then rename over the target so a crash mid-write
+      // can never leave a truncated config.json. Favourites toggle often, so
+      // this file is written far more than it used to be.
+      const tmp = `${filePath}.${process.pid}.tmp`
+      await fs.writeFile(tmp, JSON.stringify(normalized, null, 2), 'utf8')
+      await fs.rename(tmp, filePath)
       return normalized
     },
   }
@@ -38,6 +43,9 @@ function normalize(value: unknown): WorkspaceConfig {
     includePlugins: input.includePlugins ?? defaultConfig.includePlugins,
     projectRoots: Array.isArray(input.projectRoots)
       ? [...new Set(input.projectRoots.filter((root): root is string => typeof root === 'string'))]
+      : [],
+    favourites: Array.isArray(input.favourites)
+      ? [...new Set(input.favourites.filter((key): key is string => typeof key === 'string'))]
       : [],
   }
 }
