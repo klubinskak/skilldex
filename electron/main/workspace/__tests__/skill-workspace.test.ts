@@ -182,6 +182,7 @@ describe('SkillWorkspace', () => {
       includePersonal: false,
       includePlugins: false,
       projectRoots: [workspaceRoot],
+      favourites: [],
     })
     expect(snapshot.skills.find((s) => s.name === 'delta')?.origin).toEqual({
       host: 'github',
