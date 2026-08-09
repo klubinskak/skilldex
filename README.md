@@ -1,5 +1,7 @@
 # Skilldex
 
+![Skilldex dashboard](docs/screenshots/hero.png)
+
 Skilldex is a local-first dashboard for developers to discover, organize, and favourite their agent skills across global environments, projects, and Git repositories.
 
 ## Current foundation
