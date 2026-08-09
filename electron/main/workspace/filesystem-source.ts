@@ -9,7 +9,16 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { parseFrontmatter } from './frontmatter'
 import { DISABLED_DIR } from './skill-manager'
-import type { ProjectRecord, SkillFile, SkillRecord } from './types'
+import {
+  parseRemoteUrl,
+  personalOrigin,
+  pluginOrigin,
+  projectOrigin,
+  type PluginSource,
+  type RemoteInfo,
+  type SkillLockEntry,
+} from './skill-origin'
+import type { ProjectRecord, SkillFile, SkillOrigin, SkillRecord } from './types'
 
 /** Everything `readSkill` needs beyond the directory itself. */
 type ReadContext = {
@@ -18,6 +27,8 @@ type ReadContext = {
   homeDir: string
   projects: string[]
   enabled: boolean
+  /** Resolve upstream provenance for a discovered skill dir, if the source records it. */
+  originFor?: (skillDir: string) => SkillOrigin | undefined
 }
 
 export type ScanResult = {
@@ -101,6 +112,8 @@ async function readSkill(skillDir: string, ctx: ReadContext): Promise<SkillRecor
     .then((files) => files.length)
     .catch(() => 0)
 
+  const origin = ctx.originFor?.(skillDir)
+
   return {
     id: realPath,
     name: frontmatter.name?.trim() || path.basename(skillDir),
@@ -114,6 +127,7 @@ async function readSkill(skillDir: string, ctx: ReadContext): Promise<SkillRecor
     isSymlink,
     fileCount,
     projects: ctx.projects,
+    ...(origin ? { origin } : {}),
   }
 }
 
@@ -150,10 +164,27 @@ async function readEnabledAndDisabled(
 export async function scanPersonalSkills(homeDir: string): Promise<ScanResult> {
   const root = path.join(homeDir, '.claude', 'skills')
   if (!(await exists(root))) return { skills: [] }
+  // Provenance for personal skills lives in the skills installer's lock file,
+  // keyed by the installed skill folder name.
+  const lock = await loadSkillLock(homeDir)
+  const originFor = (skillDir: string) => personalOrigin(lock[path.basename(skillDir)]) ?? undefined
   try {
-    return { skills: await readEnabledAndDisabled(root, { sourceKind: 'Personal', sourceRoot: root, homeDir, projects: [] }) }
+    return {
+      skills: await readEnabledAndDisabled(root, { sourceKind: 'Personal', sourceRoot: root, homeDir, projects: [], originFor }),
+    }
   } catch (error) {
     return { skills: [], error: describe(error) }
+  }
+}
+
+/** Read `~/.agents/.skill-lock.json`'s `skills` map; empty when absent or unparseable. */
+async function loadSkillLock(homeDir: string): Promise<Record<string, SkillLockEntry>> {
+  const lockPath = path.join(homeDir, '.agents', '.skill-lock.json')
+  try {
+    const parsed = JSON.parse(await fs.readFile(lockPath, 'utf8'))
+    return (parsed?.skills as Record<string, SkillLockEntry>) ?? {}
+  } catch {
+    return {}
   }
 }
 
@@ -164,15 +195,27 @@ export async function scanPluginSkills(homeDir: string): Promise<ScanResult> {
 
   try {
     const skills: SkillRecord[] = []
+    const root = path.join(homeDir, '.claude', 'plugins')
+    // The repo backing each marketplace — used for plugins that ship inside it.
+    const marketplaceRepos = await loadMarketplaceRepos(homeDir)
+    // marketplace.json is read once per marketplace and reused across its plugins.
+    const pluginSources = new Map<string, Map<string, PluginSource>>()
     for (const marketplace of await fs.readdir(marketplaces)) {
+      const marketplaceDir = path.join(marketplaces, marketplace)
+      const marketplaceRepo = marketplaceRepos.get(marketplace) ?? null
       for (const bucket of ['plugins', 'external_plugins']) {
-        const bucketDir = path.join(marketplaces, marketplace, bucket)
+        const bucketDir = path.join(marketplaceDir, bucket)
         if (!(await exists(bucketDir))) continue
         for (const plugin of await fs.readdir(bucketDir)) {
           const skillsDir = path.join(bucketDir, plugin, 'skills')
           if (!(await exists(skillsDir))) continue
-          const root = path.join(homeDir, '.claude', 'plugins')
-          skills.push(...(await readSkillsIn(skillsDir, { sourceKind: 'Plugin', sourceRoot: root, homeDir, projects: [], enabled: true })))
+          if (!pluginSources.has(marketplace)) pluginSources.set(marketplace, await loadMarketplacePlugins(marketplaceDir))
+          const source = pluginSources.get(marketplace)!.get(plugin)
+          const originFor = (skillDir: string) =>
+            pluginOrigin(source, path.basename(skillDir), marketplaceRepo) ?? undefined
+          skills.push(
+            ...(await readSkillsIn(skillsDir, { sourceKind: 'Plugin', sourceRoot: root, homeDir, projects: [], enabled: true, originFor })),
+          )
         }
       }
     }
@@ -180,6 +223,44 @@ export async function scanPluginSkills(homeDir: string): Promise<ScanResult> {
   } catch (error) {
     return { skills: [], error: describe(error) }
   }
+}
+
+/** Map marketplace name → the repo it was cloned from, per `known_marketplaces.json`. */
+async function loadMarketplaceRepos(homeDir: string): Promise<Map<string, RemoteInfo>> {
+  const repos = new Map<string, RemoteInfo>()
+  try {
+    const file = path.join(homeDir, '.claude', 'plugins', 'known_marketplaces.json')
+    const data = JSON.parse(await fs.readFile(file, 'utf8')) as Record<string, { source?: { source?: string; repo?: string } }>
+    for (const [name, entry] of Object.entries(data)) {
+      const src = entry?.source
+      if (src?.source === 'github' && src.repo) {
+        const info = parseRemoteUrl(`https://github.com/${src.repo}.git`)
+        if (info) repos.set(name, info)
+      }
+    }
+  } catch {
+    // No manifest: string-sourced plugins simply resolve no origin.
+  }
+  return repos
+}
+
+/** Map a marketplace's plugin name → its upstream `source`, following renames. */
+async function loadMarketplacePlugins(marketplaceDir: string): Promise<Map<string, PluginSource>> {
+  const sources = new Map<string, PluginSource>()
+  try {
+    const file = path.join(marketplaceDir, '.claude-plugin', 'marketplace.json')
+    const data = JSON.parse(await fs.readFile(file, 'utf8'))
+    for (const plugin of data.plugins ?? []) {
+      if (plugin?.name && plugin?.source) sources.set(plugin.name, plugin.source)
+    }
+    for (const [from, to] of Object.entries((data.renames ?? {}) as Record<string, string>)) {
+      const source = sources.get(from)
+      if (source) sources.set(to, source)
+    }
+  } catch {
+    // No manifest (or unreadable): plugins simply resolve no origin.
+  }
+  return sources
 }
 
 /**
@@ -190,13 +271,19 @@ export async function scanProjectSkills(projectRoots: string[], homeDir: string)
   const skills: SkillRecord[] = []
   const projects: ProjectRecord[] = []
   const errors: string[] = []
+  const gitCache = new Map<string, GitMeta | null>()
 
   for (const root of projectRoots) {
     try {
       for (const projectDir of await projectDirsUnder(root)) {
         const name = path.basename(projectDir)
         const skillsDir = path.join(projectDir, '.claude', 'skills')
-        const found = await readEnabledAndDisabled(skillsDir, { sourceKind: 'Project', sourceRoot: projectDir, homeDir, projects: [name] })
+        const git = await loadGitMeta(projectDir, gitCache)
+        const originFor = git
+          ? (skillDir: string) =>
+              projectOrigin({ gitConfig: git.config, head: git.head, skillRelPath: toPosix(path.relative(git.root, skillDir)) }) ?? undefined
+          : undefined
+        const found = await readEnabledAndDisabled(skillsDir, { sourceKind: 'Project', sourceRoot: projectDir, homeDir, projects: [name], originFor })
         if (found.length === 0) continue
         skills.push(...found)
         projects.push({ name, path: tildify(projectDir, homeDir), skillCount: found.length })
@@ -207,6 +294,41 @@ export async function scanProjectSkills(projectRoots: string[], homeDir: string)
   }
 
   return { skills, projects, errors }
+}
+
+type GitMeta = { root: string; config: string; head: string | null }
+
+/** Read the enclosing clone's `.git/config` + `HEAD`, walking up and memoizing by repo root. */
+async function loadGitMeta(startDir: string, cache: Map<string, GitMeta | null>): Promise<GitMeta | null> {
+  const root = await findGitRoot(startDir)
+  if (!root) return null
+  if (cache.has(root)) return cache.get(root)!
+  let meta: GitMeta | null = null
+  try {
+    const config = await fs.readFile(path.join(root, '.git', 'config'), 'utf8')
+    const head = await fs.readFile(path.join(root, '.git', 'HEAD'), 'utf8').catch(() => null)
+    meta = { root, config, head }
+  } catch {
+    // `.git` is a worktree file or otherwise unreadable — no origin.
+  }
+  cache.set(root, meta)
+  return meta
+}
+
+/** Nearest ancestor (inclusive) containing a `.git`, or null. */
+async function findGitRoot(startDir: string): Promise<string | null> {
+  let dir = startDir
+  for (let depth = 0; depth < 40; depth++) {
+    if (await exists(path.join(dir, '.git'))) return dir
+    const parent = path.dirname(dir)
+    if (parent === dir) break
+    dir = parent
+  }
+  return null
+}
+
+function toPosix(target: string): string {
+  return target.split(path.sep).join('/')
 }
 
 /**
