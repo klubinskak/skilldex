@@ -65,7 +65,13 @@
       }
     ],
     "mac": {
-      "target": "dmg",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": "universal"
+        }
+      ],
+      "artifactName": "Skilldex-mac.${ext}",
       "icon": "build/icon.icns",
       "category": "public.app-category.developer-tools"
     },

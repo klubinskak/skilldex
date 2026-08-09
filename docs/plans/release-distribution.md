@@ -24,8 +24,10 @@ changes — once a release is published, `/releases/latest` serves the assets.
 ## Configuration (electron-builder, in package.json `build`)
 
 - `publish`: GitHub provider (`klubinskak/skilldex`).
-- `mac` → dmg (icon `build/icon.icns`), `win` → nsis, `linux` → AppImage
-  (both icons `build/icon.png`).
+- `mac` → **universal** dmg (Intel + Apple Silicon in one file) with a stable
+  `artifactName` `Skilldex-mac.dmg` — no version in the name, so the site can
+  deep-link `/releases/latest/download/Skilldex-mac.dmg` and never update it per
+  release. `win` → nsis, `linux` → AppImage (both icons `build/icon.png`).
 - Icons committed under `build/` — they were previously untracked, so no CI
   build could have found them.
 - Version bumped `0.0.0` → `0.1.0`.
