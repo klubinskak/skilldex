@@ -72,18 +72,18 @@
           "arch": "universal"
         }
       ],
-      "artifactName": "Skilldex-mac.${ext}",
+      "artifactName": "skilldex.${ext}",
       "icon": "build/icon.icns",
       "category": "public.app-category.developer-tools"
     },
     "win": {
       "target": "nsis",
-      "artifactName": "Skilldex-win.${ext}",
+      "artifactName": "skilldex.${ext}",
       "icon": "build/icon.png"
     },
     "linux": {
       "target": "AppImage",
-      "artifactName": "Skilldex-linux.${ext}",
+      "artifactName": "skilldex.${ext}",
       "icon": "build/icon.png",
       "category": "Development"
     }
