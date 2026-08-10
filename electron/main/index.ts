@@ -1,10 +1,14 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, shell } from 'electron'
 import { existsSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { createConfigStore } from './workspace/config'
 import { createSkillWorkspace } from './workspace/skill-workspace'
 import type { CreateSkillInput, WorkspaceConfig } from './workspace/types'
+
+// In dev the dock/menu show the default "Electron" name; override it before the
+// app is ready. (Packaged builds get the name from build.productName.)
+app.setName('Skilldex')
 
 function createMainWindow() {
   const window = new BrowserWindow({
@@ -13,7 +17,8 @@ function createMainWindow() {
     minWidth: 960,
     minHeight: 720,
     title: 'Skilldex',
-    backgroundColor: '#f8f8fa',
+    backgroundColor: '#09090b',
+    icon: path.join(app.getAppPath(), 'build', 'icon.png'),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -30,6 +35,13 @@ function createMainWindow() {
 }
 
 app.whenReady().then(() => {
+  // In dev the macOS dock shows the default Electron icon; set ours explicitly.
+  // (Packaged builds get the icon from build/icon.icns via electron-builder.)
+  if (process.platform === 'darwin' && app.dock) {
+    const devIcon = path.join(app.getAppPath(), 'build', 'icon.png')
+    if (existsSync(devIcon)) app.dock.setIcon(nativeImage.createFromPath(devIcon))
+  }
+
   const configStore = createConfigStore(path.join(app.getPath('userData'), 'config.json'))
   const workspace = createSkillWorkspace({ homeDir: os.homedir(), configStore })
 
