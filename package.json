@@ -77,10 +77,12 @@
     },
     "win": {
       "target": "nsis",
+      "artifactName": "Skilldex-win.${ext}",
       "icon": "build/icon.png"
     },
     "linux": {
       "target": "AppImage",
+      "artifactName": "Skilldex-linux.${ext}",
       "icon": "build/icon.png",
       "category": "Development"
     }
