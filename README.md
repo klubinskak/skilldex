@@ -9,8 +9,8 @@ Skilldex is a local-first dashboard for developers to discover, organize, and fa
 - Electron, React, TypeScript, Tailwind CSS, and shadcn/ui
 - Context-isolated Electron preload bridge; the renderer has no direct Node.js or filesystem access
 - Interactive overview dashboard with search and favourites
-- Normalized sample catalog showing global, project, and repository skill sources
-- A UI seam ready for a future `SkillWorkspace` module that discovers local skill directories and Git metadata
+- Live scan of local skill directories, normalized across Personal, Plugin, and Project sources
+- A `SkillWorkspace` module behind the preload seam that discovers skill directories, dedups across roots, and isolates per-source errors
 
 ## Architecture
 
@@ -18,17 +18,17 @@ Code is organized by feature, not by generic presentation folders:
 
 ```text
 src/
-  app/                    # composition only
+  app/                     # composition only
   features/
     dashboard/             # dashboard state and orchestration
-    skills/                # catalog model, skill list, favourites
+    skills/                # catalog model, skill list, favourites, detail
     navigation/            # workspace navigation
-    overview/              # metrics
-    repositories/          # repository watch
+    settings/              # source configuration
   ui/                      # shared shadcn/ui primitives only
+  lib/                     # shared helpers
 ```
 
-Each feature owns its model, state, and UI. The app module only composes features. The future `SkillWorkspace` module will provide a small interface for normalized workspace snapshots and change intents; filesystem and Git implementations remain behind that seam.
+Each feature owns its model, state, and UI. The app module only composes features. On the Electron main side, the `SkillWorkspace` module (`electron/main/workspace/`) exposes a small interface — get config, get snapshot, configure sources, and skill-change intents — while directory walking, manifest parsing, dedup, and settings persistence stay hidden behind that seam. The renderer reaches it only through the context-isolated `window.skilldex` preload bridge.
 
 ## Run locally
 
@@ -45,6 +45,6 @@ npm run lint
 npm run package
 ```
 
-## Next implementation slice
+## Extending
 
-Introduce a native filesystem adapter (Tauri is the intended shell) and a `SkillWorkspace` module. Its callers should only request a normalized workspace snapshot and send skill-change intents; directory walking, manifest parsing, Git inspection, and settings persistence remain inside the module.
+New capabilities go behind the `SkillWorkspace` seam rather than into the renderer. Callers request a normalized workspace snapshot and send skill-change intents; directory walking, manifest parsing, Git inspection, dedup, and settings persistence all stay inside the module. Skill scaffolding, enable/disable, and Git provenance (upstream host deep-links from `.git/config`) already live there.
