@@ -33,7 +33,11 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        # `npm install` (not `npm ci`) so each runner resolves its own platform
+        # optional deps — @tailwindcss/oxide ships per-OS native binaries plus
+        # @emnapi/* wasm fallbacks that a single-platform lockfile can't satisfy
+        # under ci's strict sync check.
+        run: npm install --no-audit --no-fund
 
       - name: Build and publish
         run: npm run release
