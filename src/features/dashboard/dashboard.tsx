@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react'
 import { AlertCircle, ListFilter, Loader2, Plus, RefreshCw } from 'lucide-react'
 import { Sidebar, type FilterKey, type SidebarCounts } from '@/features/navigation/ui/sidebar'
+import { AddRepoDialog } from '@/features/repos/ui/add-repo-dialog'
+import { InstallSkillDialog } from '@/features/repos/ui/install-skill-dialog'
+import { RepoBrowser } from '@/features/repos/ui/repo-browser'
 import { SettingsDialog } from '@/features/settings/ui/settings-dialog'
-import type { Skill } from '@/features/skills/model/skills'
+import type { RepoSkill, Skill } from '@/features/skills/model/skills'
 import { useWorkspace } from '@/features/skills/model/use-workspace'
 import { CreateSkillDialog } from '@/features/skills/ui/create-skill-dialog'
 import { ProjectGroups } from '@/features/skills/ui/project-groups'
@@ -69,12 +72,21 @@ export function Dashboard() {
     remove,
     toggleFavourite,
     create,
+    repoCatalogs,
+    reposLoading,
+    addRepo,
+    removeRepo,
+    refreshRepo,
+    installRepoSkill,
   } = useWorkspace()
   const [filter, setFilter] = useState<FilterKey>('all')
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [activeRepo, setActiveRepo] = useState<string | null>(null)
+  const [showAddRepo, setShowAddRepo] = useState(false)
+  const [installTarget, setInstallTarget] = useState<RepoSkill | null>(null)
 
   // Enabling/disabling moves a skill on disk, so its id changes. Re-select the
   // same skill (by name + kind) in the new snapshot so the detail view stays put.
@@ -146,13 +158,40 @@ export function Dashboard() {
 
   const selected = selectedId ? skills.find((skill) => skill.id === selectedId) ?? null : null
   const heading = HEADINGS[filter]
+  const activeCatalog = activeRepo ? repoCatalogs.find((repo) => repo.slug === activeRepo) ?? null : null
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#09090b] text-[#fafafa]">
-      <Sidebar active={filter} counts={counts} projects={snapshot.projects} query={query} onQuery={setQuery} onFilter={(key) => { setFilter(key); setSelectedId(null) }} onOpenSettings={() => setShowSettings(true)} />
+      <Sidebar
+        active={filter}
+        counts={counts}
+        projects={snapshot.projects}
+        repos={repoCatalogs}
+        activeRepo={activeRepo}
+        query={query}
+        onQuery={setQuery}
+        onFilter={(key) => { setFilter(key); setSelectedId(null); setActiveRepo(null) }}
+        onSelectRepo={(slug) => { setActiveRepo(slug); setSelectedId(null) }}
+        onAddRepo={() => setShowAddRepo(true)}
+        onOpenSettings={() => setShowSettings(true)}
+      />
 
       <main className="relative flex min-w-0 flex-1 flex-col">
-        {selected ? (
+        {activeCatalog ? (
+          <RepoBrowser
+            catalog={activeCatalog}
+            localSkills={skills}
+            configuredSlugs={repoCatalogs.map((repo) => repo.slug)}
+            busy={reposLoading}
+            onRefresh={() => void refreshRepo(activeCatalog.slug).catch(() => {})}
+            onRemove={() => {
+              setActiveRepo(null)
+              void removeRepo(activeCatalog.slug).catch(() => {})
+            }}
+            onInstall={(skill) => setInstallTarget(skill)}
+            onAddLinked={(slug) => addRepo(slug)}
+          />
+        ) : selected ? (
           <SkillDetail
             skill={selected}
             getReadme={getReadme}
@@ -281,6 +320,25 @@ export function Dashboard() {
         onClose={() => setShowSettings(false)}
         onConfigure={configure}
         onPickDirectory={pickDirectory}
+      />
+
+      <AddRepoDialog
+        open={showAddRepo}
+        onClose={() => setShowAddRepo(false)}
+        onAdd={async (input) => {
+          await addRepo(input)
+        }}
+      />
+
+      <InstallSkillDialog
+        skill={installTarget}
+        repoSlug={activeRepo ?? ''}
+        projects={snapshot.projects}
+        onClose={() => setInstallTarget(null)}
+        onInstall={async ({ scope, projectName }) => {
+          if (!installTarget || !activeRepo) return
+          await installRepoSkill({ repo: activeRepo, skillId: installTarget.id, scope, projectName })
+        }}
       />
     </div>
   )

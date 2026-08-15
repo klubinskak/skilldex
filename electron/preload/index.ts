@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   CreateSkillInput,
+  InstallRepoSkillInput,
+  RepoCatalog,
   SkillFile,
   WorkspaceConfig,
   WorkspaceSnapshot,
@@ -25,5 +27,14 @@ contextBridge.exposeInMainWorld('skilldex', {
       ipcRenderer.invoke('skilldex:toggle-favourite', id),
     createSkill: (input: CreateSkillInput): Promise<WorkspaceSnapshot> =>
       ipcRenderer.invoke('skilldex:create-skill', input),
+    listRepoCatalogs: (): Promise<RepoCatalog[]> => ipcRenderer.invoke('skilldex:list-repo-catalogs'),
+    addSkillRepo: (input: string): Promise<RepoCatalog[]> =>
+      ipcRenderer.invoke('skilldex:add-skill-repo', input),
+    removeSkillRepo: (slug: string): Promise<RepoCatalog[]> =>
+      ipcRenderer.invoke('skilldex:remove-skill-repo', slug),
+    refreshSkillRepo: (slug: string): Promise<RepoCatalog[]> =>
+      ipcRenderer.invoke('skilldex:refresh-skill-repo', slug),
+    installRepoSkill: (input: InstallRepoSkillInput): Promise<WorkspaceSnapshot> =>
+      ipcRenderer.invoke('skilldex:install-repo-skill', input),
   },
 })

@@ -76,11 +76,38 @@ export type WorkspaceConfig = {
   includePlugins: boolean
   projectRoots: string[]
   favourites: string[]
+  skillRepos: string[]
 }
 
 export type CreateSkillInput = {
   name: string
   description: string
+  scope: 'global' | 'project'
+  projectName?: string
+}
+
+export type RepoSkill = {
+  id: string
+  name: string
+  description: string
+  path: string
+  fileCount: number
+  webUrl: string
+}
+
+export type RepoCatalog = {
+  slug: string
+  url: string
+  ref: string
+  skills: RepoSkill[]
+  linkedRepos: string[]
+  truncated: boolean
+  error?: string
+}
+
+export type InstallRepoSkillInput = {
+  repo: string
+  skillId: string
   scope: 'global' | 'project'
   projectName?: string
 }

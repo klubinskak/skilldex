@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { createConfigStore } from './workspace/config'
 import { createSkillWorkspace } from './workspace/skill-workspace'
-import type { CreateSkillInput, WorkspaceConfig } from './workspace/types'
+import type { CreateSkillInput, InstallRepoSkillInput, WorkspaceConfig } from './workspace/types'
 
 // In dev the dock/menu show the default "Electron" name; override it before the
 // app is ready. (Packaged builds get the name from build.productName.)
@@ -71,6 +71,13 @@ app.whenReady().then(() => {
   ipcMain.handle('skilldex:remove-skill', (_event, id: string) => workspace.removeSkill(id))
   ipcMain.handle('skilldex:toggle-favourite', (_event, id: string) => workspace.toggleFavourite(id))
   ipcMain.handle('skilldex:create-skill', (_event, input: CreateSkillInput) => workspace.createSkill(input))
+  ipcMain.handle('skilldex:list-repo-catalogs', () => workspace.listRepoCatalogs())
+  ipcMain.handle('skilldex:add-skill-repo', (_event, input: string) => workspace.addSkillRepo(input))
+  ipcMain.handle('skilldex:remove-skill-repo', (_event, slug: string) => workspace.removeSkillRepo(slug))
+  ipcMain.handle('skilldex:refresh-skill-repo', (_event, slug: string) => workspace.refreshSkillRepo(slug))
+  ipcMain.handle('skilldex:install-repo-skill', (_event, input: InstallRepoSkillInput) =>
+    workspace.installRepoSkill(input),
+  )
 
   createMainWindow()
 

@@ -1,6 +1,6 @@
-import { Blocks, Boxes, FolderGit2, Globe, Heart, LayoutGrid, Monitor, PowerOff, Search, Settings } from 'lucide-react'
+import { AlertCircle, Blocks, Boxes, FolderGit2, Globe, Heart, LayoutGrid, Monitor, PackageSearch, Plus, PowerOff, Search, Settings } from 'lucide-react'
 import type { ComponentType } from 'react'
-import { ACCENT_PALETTE, type ProjectRecord } from '@/features/skills/model/skills'
+import { ACCENT_PALETTE, type ProjectRecord, type RepoCatalog } from '@/features/skills/model/skills'
 
 export type FilterKey = 'all' | 'favourites' | 'global' | 'plugin' | 'project' | 'disabled'
 
@@ -10,9 +10,14 @@ type SidebarProps = {
   active: FilterKey
   counts: SidebarCounts
   projects: ProjectRecord[]
+  repos: RepoCatalog[]
+  /** Slug of the repo whose catalog fills the main pane, if any. */
+  activeRepo: string | null
   query: string
   onQuery: (value: string) => void
   onFilter: (key: FilterKey) => void
+  onSelectRepo: (slug: string) => void
+  onAddRepo: () => void
   onOpenSettings: () => void
 }
 
@@ -25,7 +30,7 @@ const NAV: Array<{ key: FilterKey; label: string; icon: ComponentType<{ classNam
   { key: 'disabled', label: 'Disabled', icon: PowerOff },
 ]
 
-export function Sidebar({ active, counts, projects, query, onQuery, onFilter, onOpenSettings }: SidebarProps) {
+export function Sidebar({ active, counts, projects, repos, activeRepo, query, onQuery, onFilter, onSelectRepo, onAddRepo, onOpenSettings }: SidebarProps) {
   return (
     <aside className="flex w-[248px] shrink-0 flex-col border-r border-[#1c1c20] bg-[#0b0b0d] px-3 py-3.5">
       <div className="flex items-center gap-2.5 px-2 pb-3.5 pt-1.5">
@@ -52,7 +57,7 @@ export function Sidebar({ active, counts, projects, query, onQuery, onFilter, on
       <nav className="flex flex-col gap-0.5">
         {NAV.map((item) => {
           const Icon = item.icon
-          const isActive = active === item.key
+          const isActive = active === item.key && activeRepo === null
           return (
             <button
               key={item.key}
@@ -75,6 +80,53 @@ export function Sidebar({ active, counts, projects, query, onQuery, onFilter, on
           )
         })}
       </nav>
+
+      <div className="flex items-center justify-between px-2 pb-2 pt-5">
+        <span className="text-[10.5px] font-semibold uppercase tracking-[0.09em] text-[#52525b]">Skill Repos</span>
+        <button
+          type="button"
+          onClick={onAddRepo}
+          aria-label="Add skill repo"
+          className="grid size-5 place-items-center rounded-md text-[#52525b] transition hover:bg-[#141417] hover:text-[#a1a1aa]"
+        >
+          <Plus className="size-3.5" />
+        </button>
+      </div>
+      <div className="flex flex-col gap-0.5">
+        {repos.length === 0 ? (
+          <p className="px-2 text-[12px] leading-relaxed text-[#52525b]">
+            No skill repos yet. Add a GitHub repo to browse and install its skills.
+          </p>
+        ) : (
+          repos.map((repo) => {
+            const isActive = activeRepo === repo.slug
+            return (
+              <button
+                key={repo.slug}
+                type="button"
+                onClick={() => onSelectRepo(repo.slug)}
+                className={`flex items-center gap-3 rounded-[9px] px-2 py-2 text-[13px] font-medium transition ${
+                  isActive
+                    ? 'bg-[#1a1109] text-[#fb923c] shadow-[inset_2px_0_0_#f97316]'
+                    : 'text-[#a1a1aa] hover:bg-[#141417]'
+                }`}
+              >
+                <span className="flex w-[18px] justify-center">
+                  <PackageSearch className="size-[15px]" />
+                </span>
+                <span className="flex-1 truncate text-left">{repo.slug}</span>
+                {repo.error ? (
+                  <AlertCircle className="size-3.5 shrink-0 text-[#f87171]" />
+                ) : (
+                  <span className={`font-mono text-[11px] ${isActive ? 'text-[#fb923c]' : 'text-[#52525b]'}`}>
+                    {repo.skills.length}
+                  </span>
+                )}
+              </button>
+            )
+          })
+        )}
+      </div>
 
       <div className="px-2 pb-2 pt-5 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-[#52525b]">
         Projects
