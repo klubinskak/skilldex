@@ -74,6 +74,7 @@ describe('SkillWorkspace', () => {
       includePlugins: false,
       projectRoots: [workspaceRoot],
       favourites: [],
+      skillRepos: [],
     })
     expect(added.projects.map((p) => p.name)).toContain('proj1')
 
@@ -82,6 +83,7 @@ describe('SkillWorkspace', () => {
       includePlugins: false,
       projectRoots: [],
       favourites: [],
+      skillRepos: [],
     })
     expect(removed.projects).toHaveLength(0)
     expect(removed.skills).toHaveLength(0)
@@ -96,6 +98,7 @@ describe('SkillWorkspace', () => {
       includePlugins: false,
       projectRoots: [workspaceRoot],
       favourites: [],
+      skillRepos: [],
     })
 
     const projectNames = snapshot.projects.map((p) => p.name)
@@ -112,6 +115,7 @@ describe('SkillWorkspace', () => {
       includePlugins: true,
       projectRoots: [workspaceRoot],
       favourites: [],
+      skillRepos: [],
     })
     expect(snapshot.projects.map((p) => p.name)).toContain('proj1')
     expect(snapshot.skills.find((s) => s.name === 'delta')?.sourceKind).toBe('Project')
@@ -123,6 +127,7 @@ describe('SkillWorkspace', () => {
       includePlugins: false,
       projectRoots: [workspaceRoot],
       favourites: [],
+      skillRepos: [],
     })
     const shared = snapshot.skills.filter((s) => s.name === 'shared')
     expect(shared).toHaveLength(1)
@@ -131,7 +136,7 @@ describe('SkillWorkspace', () => {
   })
 
   it('persists configuration across workspace reads', async () => {
-    await workspace.configureSources({ includePersonal: false, includePlugins: false, projectRoots: [workspaceRoot], favourites: [] })
+    await workspace.configureSources({ includePersonal: false, includePlugins: false, projectRoots: [workspaceRoot], favourites: [], skillRepos: [] })
     const snapshot = await workspace.getSnapshot()
     expect(snapshot.skills.every((s) => s.sourceKind === 'Project')).toBe(true)
   })
@@ -183,6 +188,7 @@ describe('SkillWorkspace', () => {
       includePlugins: false,
       projectRoots: [workspaceRoot],
       favourites: [],
+      skillRepos: [],
     })
     expect(snapshot.skills.find((s) => s.name === 'delta')?.origin).toEqual({
       host: 'github',
@@ -242,7 +248,7 @@ describe('SkillWorkspace', () => {
     })
 
     it('creates a project skill in the named project', async () => {
-      await workspace.configureSources({ includePersonal: false, includePlugins: false, projectRoots: [workspaceRoot], favourites: [] })
+      await workspace.configureSources({ includePersonal: false, includePlugins: false, projectRoots: [workspaceRoot], favourites: [], skillRepos: [] })
       const after = await workspace.createSkill({
         name: 'Proj Skill',
         description: 'scoped',

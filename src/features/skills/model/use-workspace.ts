@@ -3,6 +3,8 @@ import {
   emptySnapshot,
   toSkill,
   type CreateSkillInput,
+  type InstallRepoSkillInput,
+  type RepoCatalog,
   type Skill,
   type SkillFile,
   type WorkspaceConfig,
@@ -26,6 +28,12 @@ export type WorkspaceState = {
   remove: (id: string) => Promise<WorkspaceSnapshot | null>
   toggleFavourite: (id: string) => Promise<WorkspaceSnapshot | null>
   create: (input: CreateSkillInput) => Promise<WorkspaceSnapshot | null>
+  repoCatalogs: RepoCatalog[]
+  reposLoading: boolean
+  addRepo: (input: string) => Promise<void>
+  removeRepo: (slug: string) => Promise<void>
+  refreshRepo: (slug: string) => Promise<void>
+  installRepoSkill: (input: InstallRepoSkillInput) => Promise<WorkspaceSnapshot | null>
 }
 
 const bridge = () => (typeof window !== 'undefined' ? window.skilldex?.workspace : undefined)
@@ -35,6 +43,8 @@ export function useWorkspace(): WorkspaceState {
   const [config, setConfig] = useState<WorkspaceConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [repoCatalogs, setRepoCatalogs] = useState<RepoCatalog[]>([])
+  const [reposLoading, setReposLoading] = useState(false)
 
   const run = useCallback(async (task: () => Promise<WorkspaceSnapshot>) => {
     setLoading(true)
@@ -109,8 +119,45 @@ export function useWorkspace(): WorkspaceState {
   const toggleFavourite = useCallback((id: string) => mutate((w) => w.toggleFavourite(id)), [mutate])
   const create = useCallback((input: CreateSkillInput) => mutate((w) => w.createSkill(input)), [mutate])
 
+  // A repo mutation that surfaces its failure to the caller (dialogs keep
+  // their error inline) while keeping the catalog list in sync on success.
+  const mutateRepos = useCallback(async (op: () => Promise<RepoCatalog[]> | undefined) => {
+    setReposLoading(true)
+    try {
+      const next = await op()
+      if (next) setRepoCatalogs(next)
+    } finally {
+      setReposLoading(false)
+    }
+  }, [])
+
+  const addRepo = useCallback(
+    (input: string) => mutateRepos(() => bridge()?.addSkillRepo(input)),
+    [mutateRepos],
+  )
+  const removeRepo = useCallback(
+    (slug: string) => mutateRepos(() => bridge()?.removeSkillRepo(slug)),
+    [mutateRepos],
+  )
+  const refreshRepo = useCallback(
+    (slug: string) => mutateRepos(() => bridge()?.refreshSkillRepo(slug)),
+    [mutateRepos],
+  )
+  const installRepoSkill = useCallback(
+    (input: InstallRepoSkillInput) => mutate((w) => w.installRepoSkill(input)),
+    [mutate],
+  )
+
   useEffect(() => {
     void rescan()
+    // Repo catalogs load independently of the local scan — they hit the
+    // network, so a slow or offline GitHub never blocks the local library.
+    setReposLoading(true)
+    bridge()
+      ?.listRepoCatalogs()
+      .then(setRepoCatalogs)
+      .catch(() => {})
+      .finally(() => setReposLoading(false))
   }, [rescan])
 
   return {
@@ -130,5 +177,11 @@ export function useWorkspace(): WorkspaceState {
     remove,
     toggleFavourite,
     create,
+    repoCatalogs,
+    reposLoading,
+    addRepo,
+    removeRepo,
+    refreshRepo,
+    installRepoSkill,
   }
 }

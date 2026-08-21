@@ -2,6 +2,8 @@ export {}
 
 import type {
   CreateSkillInput,
+  InstallRepoSkillInput,
+  RepoCatalog,
   SkillFile,
   WorkspaceConfig,
   WorkspaceSnapshot,
@@ -23,6 +25,11 @@ declare global {
         removeSkill(id: string): Promise<WorkspaceSnapshot>
         toggleFavourite(id: string): Promise<WorkspaceSnapshot>
         createSkill(input: CreateSkillInput): Promise<WorkspaceSnapshot>
+        listRepoCatalogs(): Promise<RepoCatalog[]>
+        addSkillRepo(input: string): Promise<RepoCatalog[]>
+        removeSkillRepo(slug: string): Promise<RepoCatalog[]>
+        refreshSkillRepo(slug: string): Promise<RepoCatalog[]>
+        installRepoSkill(input: InstallRepoSkillInput): Promise<WorkspaceSnapshot>
       }
     }
   }

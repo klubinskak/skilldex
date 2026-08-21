@@ -19,13 +19,23 @@ import {
   scanProjectSkills,
 } from './filesystem-source'
 import {
+  downloadRepoSkill,
+  fetchRepoCatalog,
+  parseRepoInput,
+  type FetchLike,
+  type RepoScan,
+} from './repo-catalog'
+import {
   disableSkillDir,
   enableSkillDir,
   removeSkillDir,
   scaffoldSkill,
+  slugify,
 } from './skill-manager'
 import type {
   CreateSkillInput,
+  InstallRepoSkillInput,
+  RepoCatalog,
   SkillFile,
   SkillRecord,
   SourceRecord,
@@ -36,6 +46,8 @@ import type {
 export type SkillWorkspaceDeps = {
   homeDir: string
   configStore: ConfigStore
+  /** Injected in tests; defaults to the global fetch. */
+  fetchImpl?: FetchLike
 }
 
 export type SkillWorkspace = {
@@ -58,6 +70,16 @@ export type SkillWorkspace = {
   toggleFavourite(id: string): Promise<WorkspaceSnapshot>
   /** Scaffold a new skill folder with a SKILL.md. Returns the fresh snapshot. */
   createSkill(input: CreateSkillInput): Promise<WorkspaceSnapshot>
+  /** Catalogs for every configured skill repo (per-repo errors inline, never thrown). */
+  listRepoCatalogs(): Promise<RepoCatalog[]>
+  /** Validate, scan, and persist a new skill repo. Returns all catalogs. */
+  addSkillRepo(input: string): Promise<RepoCatalog[]>
+  /** Forget a configured skill repo (never touches installed skills). Returns all catalogs. */
+  removeSkillRepo(slug: string): Promise<RepoCatalog[]>
+  /** Re-scan one configured skill repo. Returns all catalogs. */
+  refreshSkillRepo(slug: string): Promise<RepoCatalog[]>
+  /** Download a catalog skill into the global or a project skills root. */
+  installRepoSkill(input: InstallRepoSkillInput): Promise<WorkspaceSnapshot>
 }
 
 /** Management is only meaningful for skills we own on disk, never plugin skills. */
@@ -66,10 +88,62 @@ function assertManageable(skill: SkillRecord | null): asserts skill is SkillReco
   if (skill.sourceKind === 'Plugin') throw new Error('Plugin skills are managed by their plugin.')
 }
 
-export function createSkillWorkspace({ homeDir, configStore }: SkillWorkspaceDeps): SkillWorkspace {
+export function createSkillWorkspace({
+  homeDir,
+  configStore,
+  fetchImpl = globalThis.fetch as unknown as FetchLike,
+}: SkillWorkspaceDeps): SkillWorkspace {
   // Ids seen in the most recent snapshot — the allow-list guarding path access
   // so the renderer can never read or reveal an arbitrary filesystem path.
   const known = new Map<string, SkillRecord>()
+
+  // Scanned repo catalogs, keyed by slug. Main-process memory only: the
+  // renderer sees the serializable catalog, while the per-skill file lists stay
+  // here so installs can only ever fetch paths we discovered ourselves.
+  const repoScans = new Map<string, RepoScan>()
+
+  async function scanRepo(slug: string, force = false): Promise<RepoScan> {
+    const cached = repoScans.get(slug)
+    if (cached && !force) return cached
+    const scan = await fetchRepoCatalog({ slug }, fetchImpl)
+    repoScans.set(slug, scan)
+    return scan
+  }
+
+  async function catalogsFor(slugs: string[]): Promise<RepoCatalog[]> {
+    return Promise.all(
+      slugs.map(async (slug) => {
+        try {
+          return (await scanRepo(slug)).catalog
+        } catch (cause) {
+          return {
+            slug,
+            url: `https://github.com/${slug}`,
+            ref: 'HEAD',
+            skills: [],
+            linkedRepos: [],
+            truncated: false,
+            error: cause instanceof Error ? cause.message : String(cause),
+          }
+        }
+      }),
+    )
+  }
+
+  /** Skills root for a create/install target — global, or one configured project. */
+  async function resolveTargetRoot(
+    config: WorkspaceConfig,
+    scope: 'global' | 'project',
+    projectName?: string,
+  ): Promise<string> {
+    if (scope === 'project') {
+      const dirs = await resolveProjectDirs(config.projectRoots)
+      const match = dirs.find((dir) => path.basename(dir) === projectName)
+      if (!match) throw new Error(`Unknown project: ${projectName ?? '(none selected)'}`)
+      return path.join(match, '.claude', 'skills')
+    }
+    return path.join(homeDir, '.claude', 'skills')
+  }
 
   async function resolveKnown(id: string): Promise<SkillRecord | null> {
     if (known.has(id)) return known.get(id)!
@@ -197,21 +271,106 @@ export function createSkillWorkspace({ homeDir, configStore }: SkillWorkspaceDep
       if (!name) throw new Error('A skill name is required.')
 
       const config = await configStore.load()
-      let root: string
-      if (input.scope === 'project') {
-        const dirs = await resolveProjectDirs(config.projectRoots)
-        const match = dirs.find((dir) => path.basename(dir) === input.projectName)
-        if (!match) throw new Error(`Unknown project: ${input.projectName ?? '(none selected)'}`)
-        root = path.join(match, '.claude', 'skills')
-      } else {
-        root = path.join(homeDir, '.claude', 'skills')
-      }
-
+      const root = await resolveTargetRoot(config, input.scope, input.projectName)
       await fs.mkdir(root, { recursive: true })
       await scaffoldSkill(root, name, input.description.trim())
       return buildSnapshot(config)
     },
+
+    async listRepoCatalogs() {
+      const config = await configStore.load()
+      return catalogsFor(config.skillRepos)
+    },
+
+    async addSkillRepo(input) {
+      const parsed = parseRepoInput(input)
+      if (!parsed)
+        throw new Error('Enter a GitHub repository like owner/repo or https://github.com/owner/repo.')
+
+      // Scan before persisting, so a typo'd or unreachable repo is rejected
+      // with the fetch error instead of being saved broken.
+      const scan = await fetchRepoCatalog(parsed, fetchImpl)
+      repoScans.set(parsed.slug, scan)
+
+      const config = await configStore.load()
+      const saved = config.skillRepos.includes(parsed.slug)
+        ? config
+        : await configStore.save({ ...config, skillRepos: [...config.skillRepos, parsed.slug] })
+      return catalogsFor(saved.skillRepos)
+    },
+
+    async removeSkillRepo(slug) {
+      const config = await configStore.load()
+      const saved = await configStore.save({
+        ...config,
+        skillRepos: config.skillRepos.filter((existing) => existing !== slug),
+      })
+      repoScans.delete(slug)
+      return catalogsFor(saved.skillRepos)
+    },
+
+    async refreshSkillRepo(slug) {
+      const config = await configStore.load()
+      if (config.skillRepos.includes(slug)) await scanRepo(slug, true)
+      return catalogsFor(config.skillRepos)
+    },
+
+    async installRepoSkill(input) {
+      const config = await configStore.load()
+      // Installs are only allowed from repos the user has added, and only for
+      // skills we discovered ourselves — the renderer can't name arbitrary
+      // URLs or paths.
+      if (!config.skillRepos.includes(input.repo)) throw new Error('Unknown skill repo.')
+      const scan = await scanRepo(input.repo)
+      const skill = scan.catalog.skills.find((entry) => entry.id === input.skillId)
+      const files = skill && scan.filesBySkill.get(skill.id)
+      if (!skill || !files) throw new Error('Unknown skill in this repo.')
+
+      const root = await resolveTargetRoot(config, input.scope, input.projectName)
+      const dirName = skill.path ? path.posix.basename(skill.path) : slugify(skill.name)
+      await fs.mkdir(root, { recursive: true })
+      await downloadRepoSkill({
+        slug: scan.catalog.slug,
+        ref: scan.catalog.ref,
+        dir: skill.path,
+        files,
+        dest: path.join(root, dirName),
+        fetchImpl,
+      })
+
+      // Record provenance for global installs the same way the skills CLI does
+      // (~/.agents/.skill-lock.json), so the detail view's Source panel lights
+      // up. Best-effort: a lock write failure never fails the install.
+      if (input.scope === 'global') {
+        await writeSkillLockEntry(homeDir, dirName, {
+          source: scan.catalog.slug,
+          sourceType: 'github',
+          sourceUrl: `https://github.com/${scan.catalog.slug}.git`,
+          skillPath: skill.path ? `${skill.path}/SKILL.md` : 'SKILL.md',
+        }).catch(() => {})
+      }
+
+      return buildSnapshot(config)
+    },
   }
+}
+
+/** Merge one skill's provenance entry into `~/.agents/.skill-lock.json`. */
+async function writeSkillLockEntry(
+  homeDir: string,
+  skillDirName: string,
+  entry: { source: string; sourceType: string; sourceUrl: string; skillPath: string },
+): Promise<void> {
+  const lockPath = path.join(homeDir, '.agents', '.skill-lock.json')
+  let parsed: { skills?: Record<string, unknown> } = {}
+  try {
+    parsed = JSON.parse(await fs.readFile(lockPath, 'utf8'))
+  } catch {
+    // Missing or unparseable — start fresh.
+  }
+  parsed.skills = { ...(parsed.skills ?? {}), [skillDirName]: entry }
+  await fs.mkdir(path.dirname(lockPath), { recursive: true })
+  await fs.writeFile(lockPath, JSON.stringify(parsed, null, 2), 'utf8')
 }
 
 /**

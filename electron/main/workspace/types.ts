@@ -99,6 +99,8 @@ export type WorkspaceConfig = {
    * favourite-key.ts) so a favourite survives a skill being enabled/disabled.
    */
   favourites: string[]
+  /** User-added GitHub skill repos, stored as normalized `owner/repo` slugs. */
+  skillRepos: string[]
 }
 
 export type CreateSkillInput = {
@@ -109,9 +111,55 @@ export type CreateSkillInput = {
   projectName?: string
 }
 
+/** A skill discovered inside a remote GitHub repo (not yet on disk). */
+export type RepoSkill = {
+  /** Catalog id: `<owner>/<repo>:<dir-within-repo>` (dir is '' for a root-level skill). */
+  id: string
+  name: string
+  description: string
+  /** Directory path within the repo, '' when SKILL.md sits at the repo root. */
+  path: string
+  /** Number of files inside the skill's folder, per the repo tree. */
+  fileCount: number
+  /** Deep link to the skill's folder on github.com. */
+  webUrl: string
+}
+
+/** The scanned contents of one user-added GitHub skill repo. */
+export type RepoCatalog = {
+  /** Normalized `owner/repo`. */
+  slug: string
+  /** Browsable repository root, e.g. `https://github.com/owner/repo`. */
+  url: string
+  /** The branch the catalog was scanned at. */
+  ref: string
+  skills: RepoSkill[]
+  /**
+   * When the repo contains no skills but its README links to other GitHub
+   * repos (an "awesome list"), those `owner/repo` slugs — offered as one-click
+   * additions instead of a dead-end empty catalog.
+   */
+  linkedRepos: string[]
+  /** True when the listing was cut off (huge repo tree or skill cap reached). */
+  truncated: boolean
+  /** Present when the repo could not be scanned (network, rate limit, 404). */
+  error?: string
+}
+
+export type InstallRepoSkillInput = {
+  /** `owner/repo` slug of a configured skill repo. */
+  repo: string
+  /** RepoSkill catalog id within that repo. */
+  skillId: string
+  scope: 'global' | 'project'
+  /** Project directory name (from a ProjectRecord); required when scope is 'project'. */
+  projectName?: string
+}
+
 export const defaultConfig: WorkspaceConfig = {
   includePersonal: true,
   includePlugins: true,
   projectRoots: [],
   favourites: [],
+  skillRepos: [],
 }
