@@ -71,6 +71,7 @@ export function Dashboard() {
     disable,
     remove,
     toggleFavourite,
+    updateReadme,
     create,
     repoCatalogs,
     reposLoading,
@@ -199,6 +200,9 @@ export function Dashboard() {
             reveal={reveal}
             onToggle={() => void toggleSkill(selected)}
             onToggleFavourite={() => favourite(selected)}
+            onSave={async (id, content) => {
+              await updateReadme(id, content)
+            }}
             onRemove={() => void removeSkill(selected.id)}
             onBack={() => setSelectedId(null)}
           />

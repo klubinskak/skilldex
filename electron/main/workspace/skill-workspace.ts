@@ -31,6 +31,7 @@ import {
   removeSkillDir,
   scaffoldSkill,
   slugify,
+  writeSkillReadme,
 } from './skill-manager'
 import type {
   CreateSkillInput,
@@ -68,6 +69,8 @@ export type SkillWorkspace = {
   removeSkill(id: string): Promise<WorkspaceSnapshot>
   /** Flip a skill's favourite state (persisted in config). Returns the fresh snapshot. */
   toggleFavourite(id: string): Promise<WorkspaceSnapshot>
+  /** Overwrite a manageable skill's SKILL.md with new content. Returns the fresh snapshot. */
+  updateSkillReadme(id: string, content: string): Promise<WorkspaceSnapshot>
   /** Scaffold a new skill folder with a SKILL.md. Returns the fresh snapshot. */
   createSkill(input: CreateSkillInput): Promise<WorkspaceSnapshot>
   /** Catalogs for every configured skill repo (per-repo errors inline, never thrown). */
@@ -264,6 +267,19 @@ export function createSkillWorkspace({
         : [...config.favourites, key]
       const saved = await configStore.save({ ...config, favourites })
       return buildSnapshot(saved)
+    },
+
+    async updateSkillReadme(id, content) {
+      const skill = await resolveKnown(id)
+      assertManageable(skill)
+      // An empty SKILL.md is never intentional and would leave the skill with no
+      // instructions; block it. Any other content is written verbatim so no
+      // frontmatter key is ever silently dropped.
+      if (content.trim().length === 0) throw new Error('SKILL.md cannot be empty.')
+      await writeSkillReadme(skill.realPath, content)
+      // Identity is the directory, so `id`/`realPath` are unchanged; rebuilding
+      // re-reads the frontmatter, refreshing the name/description on the card.
+      return buildSnapshot(await configStore.load())
     },
 
     async createSkill(input) {

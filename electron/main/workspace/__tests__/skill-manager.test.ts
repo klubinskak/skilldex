@@ -9,6 +9,7 @@ import {
   removeSkillDir,
   scaffoldSkill,
   slugify,
+  writeSkillReadme,
 } from '../skill-manager'
 
 let root: string
@@ -108,5 +109,19 @@ describe('scaffoldSkill', () => {
   it('refuses to overwrite an existing skill', async () => {
     await scaffoldSkill(root, 'dupe', 'first')
     await expect(scaffoldSkill(root, 'dupe', 'second')).rejects.toThrow(/exists/i)
+  })
+})
+
+describe('writeSkillReadme', () => {
+  it('overwrites SKILL.md in place and leaves no temp file behind', async () => {
+    const dir = path.join(root, 'edit-me')
+    await makeSkill(dir)
+
+    const next = '---\nname: edit-me\ndescription: new\n---\n\n# body\n'
+    await writeSkillReadme(dir, next)
+
+    expect(await fs.readFile(path.join(dir, 'SKILL.md'), 'utf8')).toBe(next)
+    const leftovers = (await fs.readdir(dir)).filter((entry) => entry.includes('.tmp'))
+    expect(leftovers).toEqual([])
   })
 })

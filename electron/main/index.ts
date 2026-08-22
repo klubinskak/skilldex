@@ -70,6 +70,9 @@ app.whenReady().then(() => {
   ipcMain.handle('skilldex:disable-skill', (_event, id: string) => workspace.disableSkill(id))
   ipcMain.handle('skilldex:remove-skill', (_event, id: string) => workspace.removeSkill(id))
   ipcMain.handle('skilldex:toggle-favourite', (_event, id: string) => workspace.toggleFavourite(id))
+  ipcMain.handle('skilldex:update-skill-readme', (_event, id: string, content: string) =>
+    workspace.updateSkillReadme(id, content),
+  )
   ipcMain.handle('skilldex:create-skill', (_event, input: CreateSkillInput) => workspace.createSkill(input))
   ipcMain.handle('skilldex:list-repo-catalogs', () => workspace.listRepoCatalogs())
   ipcMain.handle('skilldex:add-skill-repo', (_event, input: string) => workspace.addSkillRepo(input))

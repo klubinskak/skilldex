@@ -24,6 +24,7 @@ declare global {
         disableSkill(id: string): Promise<WorkspaceSnapshot>
         removeSkill(id: string): Promise<WorkspaceSnapshot>
         toggleFavourite(id: string): Promise<WorkspaceSnapshot>
+        updateSkillReadme(id: string, content: string): Promise<WorkspaceSnapshot>
         createSkill(input: CreateSkillInput): Promise<WorkspaceSnapshot>
         listRepoCatalogs(): Promise<RepoCatalog[]>
         addSkillRepo(input: string): Promise<RepoCatalog[]>
