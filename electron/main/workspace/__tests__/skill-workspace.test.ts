@@ -266,6 +266,63 @@ describe('SkillWorkspace', () => {
     })
   })
 
+  describe('editing SKILL.md', () => {
+    it('writes new content and refreshes the name/description without changing identity', async () => {
+      const before = await workspace.getSnapshot()
+      const alpha = before.skills.find((s) => s.name === 'alpha')!
+
+      const next = `---\nname: renamed-alpha\ndescription: A fresh description.\n---\n\n# Renamed\n\nBody.\n`
+      const after = await workspace.updateSkillReadme(alpha.id, next)
+
+      const updated = after.skills.find((s) => s.id === alpha.id)!
+      expect(updated.name).toBe('renamed-alpha')
+      expect(updated.description).toBe('A fresh description.')
+      // Identity is the directory, so id/realPath are untouched by a content edit.
+      expect(updated.realPath).toBe(alpha.realPath)
+      expect(await fs.readFile(path.join(alpha.realPath, 'SKILL.md'), 'utf8')).toBe(next)
+    })
+
+    it('preserves frontmatter keys the parser does not understand', async () => {
+      const before = await workspace.getSnapshot()
+      const alpha = before.skills.find((s) => s.name === 'alpha')!
+
+      const raw = `---\nname: alpha\ndescription: Keeps extras.\nallowed-tools: Bash, Read\ndisable-model-invocation: true\n---\n\n# alpha\n`
+      await workspace.updateSkillReadme(alpha.id, raw)
+
+      // Round-trips byte-for-byte — no key is dropped on write.
+      expect(await fs.readFile(path.join(alpha.realPath, 'SKILL.md'), 'utf8')).toBe(raw)
+    })
+
+    it('refuses to edit a plugin skill', async () => {
+      const snapshot = await workspace.getSnapshot()
+      const gamma = snapshot.skills.find((s) => s.name === 'gamma')!
+      await expect(workspace.updateSkillReadme(gamma.id, '# hi')).rejects.toThrow(/plugin/i)
+    })
+
+    it('rejects an unknown skill id', async () => {
+      await expect(workspace.updateSkillReadme('/no/such/skill', '# hi')).rejects.toThrow(/unknown/i)
+    })
+
+    it('rejects empty content', async () => {
+      const snapshot = await workspace.getSnapshot()
+      const alpha = snapshot.skills.find((s) => s.name === 'alpha')!
+      await expect(workspace.updateSkillReadme(alpha.id, '   \n')).rejects.toThrow(/empty/i)
+    })
+
+    it('edits a disabled skill, writing to its .disabled realPath', async () => {
+      const before = await workspace.getSnapshot()
+      const alpha = before.skills.find((s) => s.name === 'alpha')!
+      const disabled = await workspace.disableSkill(alpha.id)
+      const off = disabled.skills.find((s) => s.name === 'alpha')!
+      expect(off.enabled).toBe(false)
+
+      const raw = `---\nname: alpha\ndescription: Edited while off.\n---\n\n# alpha\n`
+      await workspace.updateSkillReadme(off.id, raw)
+      expect(off.realPath).toContain('.disabled')
+      expect(await fs.readFile(path.join(off.realPath, 'SKILL.md'), 'utf8')).toBe(raw)
+    })
+  })
+
   describe('favourites', () => {
     it('toggles a skill on and off', async () => {
       const before = await workspace.getSnapshot()

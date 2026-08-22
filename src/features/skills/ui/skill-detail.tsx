@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, Check, Copy, ExternalLink, FolderOpen, Loader2, Pencil } from 'lucide-react'
 import { scopePillClass, type Skill, type SkillFile } from '../model/skills'
+import { CodeView } from './code-view'
+import { EditSkillDialog } from './edit-skill-dialog'
 import { FavouriteButton } from './favourite-button'
 import { SkillToggle } from './skill-toggle'
 
@@ -11,6 +13,7 @@ type SkillDetailProps = {
   reveal: (id: string) => Promise<boolean>
   onToggle: () => void
   onToggleFavourite: () => void
+  onSave: (id: string, content: string) => Promise<void>
   onRemove: () => void
   onBack: () => void
 }
@@ -23,14 +26,22 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export function SkillDetail({ skill, getReadme, listFiles, reveal, onToggle, onToggleFavourite, onRemove, onBack }: SkillDetailProps) {
+export function SkillDetail({ skill, getReadme, listFiles, reveal, onToggle, onToggleFavourite, onSave, onRemove, onBack }: SkillDetailProps) {
   const [tab, setTab] = useState<Tab>('instructions')
   const [readme, setReadme] = useState<string | null>(null)
   const [files, setFiles] = useState<SkillFile[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [confirmingRemove, setConfirmingRemove] = useState(false)
+  const [editing, setEditing] = useState(false)
   const [copied, setCopied] = useState(false)
   const manageable = skill.scope !== 'plugin'
+
+  // Persist the edit, then reflect the new content in the Instructions tab
+  // immediately (the dashboard snapshot refreshes the name/description).
+  const saveReadme = async (content: string) => {
+    await onSave(skill.id, content)
+    setReadme(content)
+  }
 
   const copyOrigin = () => {
     if (!skill.origin) return
@@ -101,9 +112,12 @@ export function SkillDetail({ skill, getReadme, listFiles, reveal, onToggle, onT
             </span>
             <button
               type="button"
-              disabled
-              title="Editing skills is coming soon"
-              className="flex h-9 cursor-not-allowed items-center gap-1.5 rounded-[9px] border border-[#27272a] bg-[#18181b] px-3.5 text-[12.5px] font-medium text-[#e4e4e7] opacity-60"
+              disabled={!manageable || loading}
+              onClick={() => setEditing(true)}
+              title={manageable ? 'Edit this skill’s SKILL.md' : 'Plugin skills are managed by their plugin'}
+              className={`flex h-9 items-center gap-1.5 rounded-[9px] border border-[#27272a] bg-[#18181b] px-3.5 text-[12.5px] font-medium text-[#e4e4e7] transition ${
+                manageable && !loading ? 'hover:border-[#3a3a42]' : 'cursor-not-allowed opacity-60'
+              }`}
             >
               <Pencil className="size-3.5" />
               Edit
@@ -139,9 +153,7 @@ export function SkillDetail({ skill, getReadme, listFiles, reveal, onToggle, onT
                     <span className="font-mono text-[12px] text-[#a1a1aa]">SKILL.md</span>
                     <span className="ml-auto font-mono text-[11px] text-[#52525b]">markdown</span>
                   </div>
-                  <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap px-4 py-4 font-mono text-[12.5px] leading-relaxed text-[#d4d4d8]">
-                    {readme}
-                  </pre>
+                  <CodeView content={readme} className="max-h-[420px]" />
                 </div>
               ) : (
                 <p className="text-[13px] text-[#71717a]">No SKILL.md content found.</p>
@@ -253,6 +265,14 @@ export function SkillDetail({ skill, getReadme, listFiles, reveal, onToggle, onT
           }}
         />
       )}
+
+      <EditSkillDialog
+        open={editing}
+        skillName={skill.name}
+        initialContent={readme ?? ''}
+        onClose={() => setEditing(false)}
+        onSave={saveReadme}
+      />
     </div>
   )
 }

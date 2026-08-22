@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('skilldex', {
     removeSkill: (id: string): Promise<WorkspaceSnapshot> => ipcRenderer.invoke('skilldex:remove-skill', id),
     toggleFavourite: (id: string): Promise<WorkspaceSnapshot> =>
       ipcRenderer.invoke('skilldex:toggle-favourite', id),
+    updateSkillReadme: (id: string, content: string): Promise<WorkspaceSnapshot> =>
+      ipcRenderer.invoke('skilldex:update-skill-readme', id, content),
     createSkill: (input: CreateSkillInput): Promise<WorkspaceSnapshot> =>
       ipcRenderer.invoke('skilldex:create-skill', input),
     listRepoCatalogs: (): Promise<RepoCatalog[]> => ipcRenderer.invoke('skilldex:list-repo-catalogs'),

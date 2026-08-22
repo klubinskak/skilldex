@@ -95,6 +95,19 @@ export async function scaffoldSkill(root: string, name: string, description: str
   return dir
 }
 
+/**
+ * Overwrite a skill's `SKILL.md` atomically. Writes a sibling temp file then
+ * renames it over the target, so a crash mid-write can never truncate a real
+ * skill's instructions. `skillDir` is the canonical directory (`realPath`), so
+ * this always writes the real file even when the skill is reached via a symlink.
+ */
+export async function writeSkillReadme(skillDir: string, content: string): Promise<void> {
+  const target = path.join(skillDir, 'SKILL.md')
+  const tmp = `${target}.${process.pid}.tmp`
+  await fs.writeFile(tmp, content, 'utf8')
+  await fs.rename(tmp, target)
+}
+
 async function assertMissing(target: string, message?: string): Promise<void> {
   try {
     await fs.access(target)

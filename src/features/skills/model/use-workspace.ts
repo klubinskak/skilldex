@@ -27,6 +27,7 @@ export type WorkspaceState = {
   disable: (id: string) => Promise<WorkspaceSnapshot | null>
   remove: (id: string) => Promise<WorkspaceSnapshot | null>
   toggleFavourite: (id: string) => Promise<WorkspaceSnapshot | null>
+  updateReadme: (id: string, content: string) => Promise<WorkspaceSnapshot | null>
   create: (input: CreateSkillInput) => Promise<WorkspaceSnapshot | null>
   repoCatalogs: RepoCatalog[]
   reposLoading: boolean
@@ -117,6 +118,10 @@ export function useWorkspace(): WorkspaceState {
   const disable = useCallback((id: string) => mutate((w) => w.disableSkill(id)), [mutate])
   const remove = useCallback((id: string) => mutate((w) => w.removeSkill(id)), [mutate])
   const toggleFavourite = useCallback((id: string) => mutate((w) => w.toggleFavourite(id)), [mutate])
+  const updateReadme = useCallback(
+    (id: string, content: string) => mutate((w) => w.updateSkillReadme(id, content)),
+    [mutate],
+  )
   const create = useCallback((input: CreateSkillInput) => mutate((w) => w.createSkill(input)), [mutate])
 
   // A repo mutation that surfaces its failure to the caller (dialogs keep
@@ -176,6 +181,7 @@ export function useWorkspace(): WorkspaceState {
     disable,
     remove,
     toggleFavourite,
+    updateReadme,
     create,
     repoCatalogs,
     reposLoading,
