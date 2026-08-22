@@ -5,7 +5,7 @@ import { AddRepoDialog } from '@/features/repos/ui/add-repo-dialog'
 import { InstallSkillDialog } from '@/features/repos/ui/install-skill-dialog'
 import { RepoBrowser } from '@/features/repos/ui/repo-browser'
 import { SettingsDialog } from '@/features/settings/ui/settings-dialog'
-import type { RepoSkill, Skill } from '@/features/skills/model/skills'
+import { isOwned, type RepoSkill, type Skill } from '@/features/skills/model/skills'
 import { useWorkspace } from '@/features/skills/model/use-workspace'
 import { CreateSkillDialog } from '@/features/skills/ui/create-skill-dialog'
 import { ProjectGroups } from '@/features/skills/ui/project-groups'
@@ -22,6 +22,11 @@ const HEADINGS: Record<FilterKey, { title: string; subtitle: string; pill: strin
     title: 'Favourites',
     subtitle: 'Skills you have starred. Enabled or not, they live here for quick access.',
     pill: 'Starred',
+  },
+  mine: {
+    title: 'My Skills',
+    subtitle: 'Skills you own locally — made or kept on this machine, not installed from a repo.',
+    pill: 'Locally owned',
   },
   global: {
     title: 'Global Skills',
@@ -48,6 +53,7 @@ const HEADINGS: Record<FilterKey, { title: string; subtitle: string; pill: strin
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: 'all', label: 'All' },
   { key: 'favourites', label: 'Favourites' },
+  { key: 'mine', label: 'Mine' },
   { key: 'global', label: 'Global' },
   { key: 'plugin', label: 'Plugins' },
   { key: 'project', label: 'Project' },
@@ -126,6 +132,8 @@ export function Dashboard() {
       all: active.length,
       // Favourites are shown regardless of enabled state (Q7), so count them all.
       favourites: skills.filter((skill) => skill.isFavourite).length,
+      // Owned skills are shown regardless of enabled state too, so count them all.
+      mine: skills.filter(isOwned).length,
       global: active.filter((skill) => skill.scope === 'global').length,
       plugin: active.filter((skill) => skill.scope === 'plugin').length,
       project: active.filter((skill) => skill.scope === 'project').length,
@@ -139,9 +147,11 @@ export function Dashboard() {
         ? skills.filter((skill) => !skill.enabled)
         : filter === 'favourites'
           ? skills.filter((skill) => skill.isFavourite)
-          : filter === 'all'
-            ? skills.filter((skill) => skill.enabled)
-            : skills.filter((skill) => skill.enabled && skill.scope === filter)
+          : filter === 'mine'
+            ? skills.filter(isOwned)
+            : filter === 'all'
+              ? skills.filter((skill) => skill.enabled)
+              : skills.filter((skill) => skill.enabled && skill.scope === filter)
     const value = query.trim().toLowerCase()
     if (!value) return scoped
     return scoped.filter((skill) =>
@@ -281,7 +291,9 @@ export function Dashboard() {
                         ? 'No disabled skills. Everything is switched on.'
                         : filter === 'favourites'
                           ? 'No favourites yet. Tap the heart on any skill to star it.'
-                          : 'No skills found in this scope yet.'}
+                          : filter === 'mine'
+                            ? 'No skills of your own yet. Create one with New Skill and it will show up here.'
+                            : 'No skills found in this scope yet.'}
                 </div>
               ) : projectGroups && projectGroups.length > 0 ? (
                 <ProjectGroups

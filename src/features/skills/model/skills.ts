@@ -161,6 +161,16 @@ export function scopeFor(kind: SkillSourceKind): SkillScope {
   return 'project'
 }
 
+/**
+ * Whether a skill is one the user owns locally — a Personal ("global") skill
+ * with no recorded upstream origin (i.e. not installed from a repo). Skills
+ * carry no author metadata, so this is provenance-based ownership, not proven
+ * authorship. See docs/adr/0002-owned-skills-detected-by-absent-origin.md.
+ */
+export function isOwned(skill: Pick<Skill, 'scope' | 'origin'>): boolean {
+  return skill.scope === 'global' && !skill.origin
+}
+
 /** Tailwind classes for the coloured scope pill shown on cards and detail. */
 export function scopePillClass(scope: SkillScope): string {
   switch (scope) {
