@@ -1,8 +1,8 @@
-import { AlertCircle, Blocks, Boxes, FolderGit2, Globe, Heart, LayoutGrid, Monitor, PackageSearch, Plus, PowerOff, Search, Settings } from 'lucide-react'
+import { AlertCircle, Blocks, Boxes, FolderGit2, Globe, Heart, LayoutGrid, Monitor, PackageSearch, Plus, PowerOff, Search, Settings, User } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { ACCENT_PALETTE, type ProjectRecord, type RepoCatalog } from '@/features/skills/model/skills'
 
-export type FilterKey = 'all' | 'favourites' | 'global' | 'plugin' | 'project' | 'disabled'
+export type FilterKey = 'all' | 'favourites' | 'mine' | 'global' | 'plugin' | 'project' | 'disabled'
 
 export type SidebarCounts = Record<FilterKey, number>
 
@@ -24,6 +24,7 @@ type SidebarProps = {
 const NAV: Array<{ key: FilterKey; label: string; icon: ComponentType<{ className?: string }> }> = [
   { key: 'all', label: 'All Skills', icon: LayoutGrid },
   { key: 'favourites', label: 'Favourites', icon: Heart },
+  { key: 'mine', label: 'My Skills', icon: User },
   { key: 'global', label: 'Global', icon: Globe },
   { key: 'plugin', label: 'Plugins', icon: Blocks },
   { key: 'project', label: 'Projects', icon: FolderGit2 },
