@@ -16,6 +16,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { parseFrontmatter } from './frontmatter'
+import type { ScanFile } from './security/types'
 import type { RepoCatalog, RepoSkill } from './types'
 
 export type FetchLike = (url: string, init?: { headers?: Record<string, string> }) => Promise<{
@@ -94,7 +95,16 @@ export function parseRepoInput(input: string): RepoRef | null {
 /** Scan a GitHub repo for skills (directories containing a SKILL.md). */
 export async function fetchRepoCatalog(repo: RepoRef, fetchImpl: FetchLike): Promise<RepoScan> {
   const { slug } = repo
-  const ref = repo.ref ?? (await fetchDefaultBranch(slug, fetchImpl))
+  // The repo-metadata call gives us the default branch *and* the star count in
+  // one request, so reputation costs nothing extra. Skipped only when a caller
+  // pins an explicit ref (rare); stars are optional so that path is fine.
+  let ref = repo.ref
+  let stars: number | undefined
+  if (!ref) {
+    const meta = await fetchRepoMeta(slug, fetchImpl)
+    ref = meta.defaultBranch
+    stars = meta.stars
+  }
   const tree = await fetchTree(slug, ref, fetchImpl)
 
   const blobs = tree.entries.filter((entry) => entry.type === 'blob')
@@ -142,9 +152,39 @@ export async function fetchRepoCatalog(repo: RepoRef, fetchImpl: FetchLike): Pro
       skills,
       linkedRepos,
       truncated: tree.truncated || skillDirs.length > MAX_SKILLS,
+      stars,
     },
     filesBySkill,
   }
+}
+
+/**
+ * Fetch one repo skill's files into memory (not to disk) for a pre-install
+ * scan. Mirrors `downloadRepoSkill`'s fetch, but returns `ScanFile[]` — binary
+ * blobs come back with `contents: null` so the scanner can reason about them
+ * without decoding. Failures for a single file are tolerated (best-effort scan).
+ */
+export async function readRepoSkillFiles(opts: {
+  slug: string
+  ref: string
+  dir: string
+  files: string[]
+  fetchImpl: FetchLike
+}): Promise<ScanFile[]> {
+  const { slug, ref, dir, files, fetchImpl } = opts
+  return mapPool(files, FETCH_POOL, async (file): Promise<ScanFile> => {
+    const repoPath = dir ? `${dir}/${file}` : file
+    const buffer = await fetchRaw(slug, ref, repoPath, fetchImpl).catch(() => null)
+    const contents = buffer && !bufferLooksBinary(buffer) ? buffer.toString('utf8') : null
+    return { relativePath: file, contents, sizeBytes: buffer?.length ?? 0 }
+  })
+}
+
+/** A NUL byte in the first few KB marks a blob as binary (see scan-skill-dir). */
+function bufferLooksBinary(buffer: Buffer): boolean {
+  const end = Math.min(buffer.length, 8000)
+  for (let i = 0; i < end; i++) if (buffer[i] === 0) return true
+  return false
 }
 
 /**
@@ -182,9 +222,18 @@ export async function downloadRepoSkill(opts: {
 
 type TreeEntry = { path: string; type: string }
 
-async function fetchDefaultBranch(slug: string, fetchImpl: FetchLike): Promise<string> {
-  const data = (await apiGet(`${API}/repos/${slug}`, slug, fetchImpl)) as { default_branch?: string }
-  return data.default_branch || 'main'
+async function fetchRepoMeta(
+  slug: string,
+  fetchImpl: FetchLike,
+): Promise<{ defaultBranch: string; stars: number | undefined }> {
+  const data = (await apiGet(`${API}/repos/${slug}`, slug, fetchImpl)) as {
+    default_branch?: string
+    stargazers_count?: number
+  }
+  return {
+    defaultBranch: data.default_branch || 'main',
+    stars: typeof data.stargazers_count === 'number' ? data.stargazers_count : undefined,
+  }
 }
 
 async function fetchTree(

@@ -34,6 +34,14 @@ access and talks to disk only through a locked-down Electron bridge.
 - **Browse and install from custom Git repos.** Point Skilldex at a GitHub skill
   repository, browse what it offers, and install skills into the scope you
   choose.
+- **Security scan — "is this safe to run?"** A local, offline heuristic scan of
+  every skill's `SKILL.md` and scripts flags known attack patterns (piping
+  remote content into a shell, credential/`.env` exfiltration, obfuscated
+  payloads, prompt-injection phrasing) and shows a red / amber / green trust
+  badge with the exact risky line. It runs on your installed skills and again
+  *before* you install one from a repo — a risky install asks for a deliberate
+  confirmation. GitHub stars sit beside the badge as a separate reputation
+  signal, never mixed into the safety verdict.
 - **Smart deduplication.** A skill surfaced from more than one root is shown once
   with a stable identity, and a problem reading one source never breaks the rest.
 

@@ -3,7 +3,10 @@ import type {
   CreateSkillInput,
   InstallRepoSkillInput,
   RepoCatalog,
+  ScanRepoSkillInput,
   SkillFile,
+  SkillScan,
+  SkillScanResult,
   WorkspaceConfig,
   WorkspaceSnapshot,
 } from '../main/workspace/types'
@@ -38,5 +41,11 @@ contextBridge.exposeInMainWorld('skilldex', {
       ipcRenderer.invoke('skilldex:refresh-skill-repo', slug),
     installRepoSkill: (input: InstallRepoSkillInput): Promise<WorkspaceSnapshot> =>
       ipcRenderer.invoke('skilldex:install-repo-skill', input),
+    scanSkill: (id: string): Promise<SkillScanResult | null> =>
+      ipcRenderer.invoke('skilldex:scan-skill', id),
+    markSkillReviewed: (id: string, reviewed: boolean): Promise<SkillScanResult | null> =>
+      ipcRenderer.invoke('skilldex:mark-skill-reviewed', id, reviewed),
+    scanRepoSkill: (input: ScanRepoSkillInput): Promise<SkillScan> =>
+      ipcRenderer.invoke('skilldex:scan-repo-skill', input),
   },
 })

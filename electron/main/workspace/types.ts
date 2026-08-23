@@ -6,6 +6,15 @@
  * management writes; `sourceRoot` is a display-friendly (tilde) label.
  */
 
+export type {
+  ScanVerdict,
+  FindingSeverity,
+  FindingCategory,
+  SkillFinding,
+  SkillScan,
+  SkillScanResult,
+} from './security/types'
+
 export type SkillSourceKind = 'Personal' | 'Plugin' | 'Project'
 
 export type SkillRecord = {
@@ -101,6 +110,11 @@ export type WorkspaceConfig = {
   favourites: string[]
   /** User-added GitHub skill repos, stored as normalized `owner/repo` slugs. */
   skillRepos: string[]
+  /**
+   * Content hashes the user has marked as "reviewed" (safe), suppressing the
+   * skill's trust badge. Keyed by content so any file edit re-flags the skill.
+   */
+  reviewed: string[]
 }
 
 export type CreateSkillInput = {
@@ -142,6 +156,8 @@ export type RepoCatalog = {
   linkedRepos: string[]
   /** True when the listing was cut off (huge repo tree or skill cap reached). */
   truncated: boolean
+  /** GitHub stargazer count — a reputation signal, shown apart from the safety scan. */
+  stars?: number
   /** Present when the repo could not be scanned (network, rate limit, 404). */
   error?: string
 }
@@ -156,10 +172,19 @@ export type InstallRepoSkillInput = {
   projectName?: string
 }
 
+/** Which configured repo skill to scan before installing. */
+export type ScanRepoSkillInput = {
+  /** `owner/repo` slug of a configured skill repo. */
+  repo: string
+  /** RepoSkill catalog id within that repo. */
+  skillId: string
+}
+
 export const defaultConfig: WorkspaceConfig = {
   includePersonal: true,
   includePlugins: true,
   projectRoots: [],
   favourites: [],
   skillRepos: [],
+  reviewed: [],
 }

@@ -50,5 +50,8 @@ function normalize(value: unknown): WorkspaceConfig {
     skillRepos: Array.isArray(input.skillRepos)
       ? [...new Set(input.skillRepos.filter((slug): slug is string => typeof slug === 'string'))]
       : [],
+    reviewed: Array.isArray(input.reviewed)
+      ? [...new Set(input.reviewed.filter((hash): hash is string => typeof hash === 'string'))]
+      : [],
   }
 }

@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   emptySnapshot,
   toSkill,
   type CreateSkillInput,
   type InstallRepoSkillInput,
   type RepoCatalog,
+  type ScanRepoSkillInput,
   type Skill,
   type SkillFile,
+  type SkillScan,
+  type SkillScanResult,
   type WorkspaceConfig,
   type WorkspaceSnapshot,
 } from './skills'
@@ -29,6 +32,14 @@ export type WorkspaceState = {
   toggleFavourite: (id: string) => Promise<WorkspaceSnapshot | null>
   updateReadme: (id: string, content: string) => Promise<WorkspaceSnapshot | null>
   create: (input: CreateSkillInput) => Promise<WorkspaceSnapshot | null>
+  /** Cached local scans by skill id; a skill is absent until first scanned. */
+  scans: Record<string, SkillScanResult>
+  /** Lazily scan a skill (deduped); result lands in `scans`. */
+  requestScan: (id: string) => void
+  /** Mark or clear a skill's reviewed state; updates `scans`. */
+  markReviewed: (id: string, reviewed: boolean) => Promise<SkillScanResult | null>
+  /** Scan a repo skill before install (network read, nothing written). */
+  scanRepoSkill: (input: ScanRepoSkillInput) => Promise<SkillScan | null>
   repoCatalogs: RepoCatalog[]
   reposLoading: boolean
   addRepo: (input: string) => Promise<void>
@@ -46,6 +57,9 @@ export function useWorkspace(): WorkspaceState {
   const [error, setError] = useState<string | null>(null)
   const [repoCatalogs, setRepoCatalogs] = useState<RepoCatalog[]>([])
   const [reposLoading, setReposLoading] = useState(false)
+  const [scans, setScans] = useState<Record<string, SkillScanResult>>({})
+  // Ids already scanned or in flight — dedupes the lazy per-skill scan requests.
+  const requestedScans = useRef<Set<string>>(new Set())
 
   const run = useCallback(async (task: () => Promise<WorkspaceSnapshot>) => {
     setLoading(true)
@@ -124,6 +138,50 @@ export function useWorkspace(): WorkspaceState {
   )
   const create = useCallback((input: CreateSkillInput) => mutate((w) => w.createSkill(input)), [mutate])
 
+  const requestScan = useCallback((id: string) => {
+    if (requestedScans.current.has(id)) return
+    requestedScans.current.add(id)
+    bridge()
+      ?.scanSkill(id)
+      .then((result) => {
+        if (result) setScans((prev) => ({ ...prev, [id]: result }))
+      })
+      .catch(() => {
+        requestedScans.current.delete(id) // let a later view retry
+      })
+  }, [])
+
+  const markReviewed = useCallback(async (id: string, reviewed: boolean) => {
+    const result = (await bridge()?.markSkillReviewed(id, reviewed)) ?? null
+    if (result) setScans((prev) => ({ ...prev, [id]: result }))
+    return result
+  }, [])
+
+  const scanRepoSkill = useCallback(
+    (input: ScanRepoSkillInput) => bridge()?.scanRepoSkill(input) ?? Promise.resolve(null),
+    [],
+  )
+
+  // Editing a skill's SKILL.md changes its content, so its cached scan is stale.
+  const invalidateScan = useCallback((id: string) => {
+    requestedScans.current.delete(id)
+    setScans((prev) => {
+      if (!(id in prev)) return prev
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+  }, [])
+
+  const updateReadmeAndRescan = useCallback(
+    async (id: string, content: string) => {
+      const next = await updateReadme(id, content)
+      invalidateScan(id)
+      return next
+    },
+    [updateReadme, invalidateScan],
+  )
+
   // A repo mutation that surfaces its failure to the caller (dialogs keep
   // their error inline) while keeping the catalog list in sync on success.
   const mutateRepos = useCallback(async (op: () => Promise<RepoCatalog[]> | undefined) => {
@@ -181,8 +239,12 @@ export function useWorkspace(): WorkspaceState {
     disable,
     remove,
     toggleFavourite,
-    updateReadme,
+    updateReadme: updateReadmeAndRescan,
     create,
+    scans,
+    requestScan,
+    markReviewed,
+    scanRepoSkill,
     repoCatalogs,
     reposLoading,
     addRepo,

@@ -37,6 +37,73 @@ export type SkillFile = {
   sizeBytes: number
 }
 
+// ---- security scan (mirrors electron/main/workspace/security/types.ts) ----
+
+export type ScanVerdict = 'red' | 'amber' | 'green'
+export type FindingSeverity = 'red' | 'amber'
+export type FindingCategory =
+  | 'pipe-to-shell'
+  | 'credential-exfiltration'
+  | 'obfuscated-execution'
+  | 'network-access'
+  | 'sensitive-path-read'
+  | 'dynamic-eval'
+  | 'destructive-fs'
+  | 'prompt-injection'
+  | 'suspicious-binary'
+
+export type SkillFinding = {
+  severity: FindingSeverity
+  category: FindingCategory
+  file: string
+  line: number
+  matchedText: string
+  why: string
+}
+
+export type SkillScan = {
+  verdict: ScanVerdict
+  findings: SkillFinding[]
+}
+
+export type SkillScanResult = SkillScan & {
+  reviewed: boolean
+}
+
+export type ScanRepoSkillInput = {
+  repo: string
+  skillId: string
+}
+
+/** Presentation for a verdict badge: label, dot colour, and pill classes. */
+export function verdictMeta(verdict: ScanVerdict): {
+  label: string
+  dot: string
+  pill: string
+} {
+  switch (verdict) {
+    case 'red':
+      return { label: 'Risky', dot: '#f87171', pill: 'text-[#f87171] bg-[#2a0e12] border-[#4a1a20]' }
+    case 'amber':
+      return { label: 'Caution', dot: '#fbbf24', pill: 'text-[#fbbf24] bg-[#2a1f09] border-[#4a3410]' }
+    default:
+      return { label: 'Clean', dot: '#4ade80', pill: 'text-[#4ade80] bg-[#0f1f12] border-[#1c3a22]' }
+  }
+}
+
+/** Human label for a finding category, shown as the finding's heading. */
+export const CATEGORY_LABEL: Record<FindingCategory, string> = {
+  'pipe-to-shell': 'Pipe to shell',
+  'credential-exfiltration': 'Credential exfiltration',
+  'obfuscated-execution': 'Obfuscated execution',
+  'network-access': 'Network access',
+  'sensitive-path-read': 'Sensitive path',
+  'dynamic-eval': 'Dynamic code execution',
+  'destructive-fs': 'Destructive filesystem op',
+  'prompt-injection': 'Prompt injection',
+  'suspicious-binary': 'Executable binary',
+}
+
 export type ProjectRecord = {
   name: string
   path: string
@@ -77,6 +144,7 @@ export type WorkspaceConfig = {
   projectRoots: string[]
   favourites: string[]
   skillRepos: string[]
+  reviewed: string[]
 }
 
 export type CreateSkillInput = {
@@ -102,6 +170,7 @@ export type RepoCatalog = {
   skills: RepoSkill[]
   linkedRepos: string[]
   truncated: boolean
+  stars?: number
   error?: string
 }
 

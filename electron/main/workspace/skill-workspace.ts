@@ -22,9 +22,12 @@ import {
   downloadRepoSkill,
   fetchRepoCatalog,
   parseRepoInput,
+  readRepoSkillFiles,
   type FetchLike,
   type RepoScan,
 } from './repo-catalog'
+import { scanSkillDir } from './security/scan-skill-dir'
+import { scanSkillFiles } from './security/scanner'
 import {
   disableSkillDir,
   enableSkillDir,
@@ -37,8 +40,11 @@ import type {
   CreateSkillInput,
   InstallRepoSkillInput,
   RepoCatalog,
+  ScanRepoSkillInput,
   SkillFile,
   SkillRecord,
+  SkillScan,
+  SkillScanResult,
   SourceRecord,
   WorkspaceConfig,
   WorkspaceSnapshot,
@@ -83,6 +89,12 @@ export type SkillWorkspace = {
   refreshSkillRepo(slug: string): Promise<RepoCatalog[]>
   /** Download a catalog skill into the global or a project skills root. */
   installRepoSkill(input: InstallRepoSkillInput): Promise<WorkspaceSnapshot>
+  /** Static security scan of a known local skill, with review state. Null if unknown. */
+  scanSkill(id: string): Promise<SkillScanResult | null>
+  /** Mark (or clear) a skill's current content as reviewed. Returns the updated scan. */
+  markSkillReviewed(id: string, reviewed: boolean): Promise<SkillScanResult | null>
+  /** Scan a configured repo skill's files before installing (nothing is written). */
+  scanRepoSkill(input: ScanRepoSkillInput): Promise<SkillScan>
 }
 
 /** Management is only meaningful for skills we own on disk, never plugin skills. */
@@ -104,6 +116,10 @@ export function createSkillWorkspace({
   // renderer sees the serializable catalog, while the per-skill file lists stay
   // here so installs can only ever fetch paths we discovered ourselves.
   const repoScans = new Map<string, RepoScan>()
+
+  // Last scan per skill id, with the content hash it was computed against. Lets
+  // `markSkillReviewed` reuse the hash the user just saw without re-reading disk.
+  const scanCache = new Map<string, { hash: string; scan: SkillScan }>()
 
   async function scanRepo(slug: string, force = false): Promise<RepoScan> {
     const cached = repoScans.get(slug)
@@ -367,6 +383,56 @@ export function createSkillWorkspace({
       }
 
       return buildSnapshot(config)
+    },
+
+    async scanSkill(id) {
+      const skill = await resolveKnown(id)
+      if (!skill) return null
+      const { scan, contentHash } = await scanSkillDir(skill.realPath)
+      scanCache.set(id, { hash: contentHash, scan })
+      const config = await configStore.load()
+      return { ...scan, reviewed: config.reviewed.includes(contentHash) }
+    },
+
+    async markSkillReviewed(id, reviewed) {
+      const skill = await resolveKnown(id)
+      if (!skill) return null
+      // Reuse the hash from the scan the user just looked at; only re-read if we
+      // somehow have no cached scan for this skill.
+      const cached = scanCache.get(id)
+      const { scan, contentHash } = cached
+        ? { scan: cached.scan, contentHash: cached.hash }
+        : await scanSkillDir(skill.realPath).then((r) => {
+            scanCache.set(id, { hash: r.contentHash, scan: r.scan })
+            return r
+          })
+
+      const config = await configStore.load()
+      const already = config.reviewed.includes(contentHash)
+      if (reviewed !== already) {
+        const next = reviewed
+          ? [...config.reviewed, contentHash]
+          : config.reviewed.filter((hash) => hash !== contentHash)
+        await configStore.save({ ...config, reviewed: next })
+      }
+      return { ...scan, reviewed }
+    },
+
+    async scanRepoSkill(input) {
+      const config = await configStore.load()
+      if (!config.skillRepos.includes(input.repo)) throw new Error('Unknown skill repo.')
+      const scan = await scanRepo(input.repo)
+      const skill = scan.catalog.skills.find((entry) => entry.id === input.skillId)
+      const files = skill && scan.filesBySkill.get(skill.id)
+      if (!skill || !files) throw new Error('Unknown skill in this repo.')
+      const scanFiles = await readRepoSkillFiles({
+        slug: scan.catalog.slug,
+        ref: scan.catalog.ref,
+        dir: skill.path,
+        files,
+        fetchImpl,
+      })
+      return scanSkillFiles(scanFiles)
     },
   }
 }

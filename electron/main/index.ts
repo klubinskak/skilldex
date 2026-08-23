@@ -4,7 +4,12 @@ import os from 'node:os'
 import path from 'node:path'
 import { createConfigStore } from './workspace/config'
 import { createSkillWorkspace } from './workspace/skill-workspace'
-import type { CreateSkillInput, InstallRepoSkillInput, WorkspaceConfig } from './workspace/types'
+import type {
+  CreateSkillInput,
+  InstallRepoSkillInput,
+  ScanRepoSkillInput,
+  WorkspaceConfig,
+} from './workspace/types'
 
 // In dev the dock/menu show the default "Electron" name; override it before the
 // app is ready. (Packaged builds get the name from build.productName.)
@@ -80,6 +85,13 @@ app.whenReady().then(() => {
   ipcMain.handle('skilldex:refresh-skill-repo', (_event, slug: string) => workspace.refreshSkillRepo(slug))
   ipcMain.handle('skilldex:install-repo-skill', (_event, input: InstallRepoSkillInput) =>
     workspace.installRepoSkill(input),
+  )
+  ipcMain.handle('skilldex:scan-skill', (_event, id: string) => workspace.scanSkill(id))
+  ipcMain.handle('skilldex:mark-skill-reviewed', (_event, id: string, reviewed: boolean) =>
+    workspace.markSkillReviewed(id, reviewed),
+  )
+  ipcMain.handle('skilldex:scan-repo-skill', (_event, input: ScanRepoSkillInput) =>
+    workspace.scanRepoSkill(input),
   )
 
   createMainWindow()
