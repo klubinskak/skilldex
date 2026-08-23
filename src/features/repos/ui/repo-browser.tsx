@@ -1,6 +1,15 @@
-import { useMemo, useState } from 'react'
-import { AlertCircle, Check, Download, FileText, Link2, ListTree, Loader2, RefreshCw, Trash2 } from 'lucide-react'
-import { iconColorsFor, monoFor, type RepoCatalog, type RepoSkill, type Skill } from '@/features/skills/model/skills'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AlertCircle, Check, Download, FileText, Link2, ListTree, Loader2, RefreshCw, Star, Trash2 } from 'lucide-react'
+import {
+  iconColorsFor,
+  monoFor,
+  type RepoCatalog,
+  type RepoSkill,
+  type ScanRepoSkillInput,
+  type Skill,
+  type SkillScan,
+} from '@/features/skills/model/skills'
+import { TrustBadge } from '@/features/skills/ui/trust-badge'
 
 type RepoBrowserProps = {
   catalog: RepoCatalog
@@ -9,6 +18,7 @@ type RepoBrowserProps = {
   /** Slugs of every configured repo, so linked repos already added show as such. */
   configuredSlugs: string[]
   busy: boolean
+  scanRepoSkill: (input: ScanRepoSkillInput) => Promise<SkillScan | null>
   onRefresh: () => void
   onRemove: () => void
   onInstall: (skill: RepoSkill) => void
@@ -20,12 +30,37 @@ export function RepoBrowser({
   localSkills,
   configuredSlugs,
   busy,
+  scanRepoSkill,
   onRefresh,
   onRemove,
   onInstall,
   onAddLinked,
 }: RepoBrowserProps) {
   const [query, setQuery] = useState('')
+
+  // Lazy, per-skill pre-install scans, cached by catalog-skill id. Only skills
+  // scrolled into view are fetched+scanned, so a huge repo never triggers a
+  // storm of network reads. Cleared when the browsed repo changes.
+  const [scans, setScans] = useState<Record<string, SkillScan>>({})
+  const requestedScans = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    requestedScans.current = new Set()
+    setScans({})
+  }, [catalog.slug])
+  const requestScan = useCallback(
+    (skillId: string) => {
+      if (requestedScans.current.has(skillId)) return
+      requestedScans.current.add(skillId)
+      scanRepoSkill({ repo: catalog.slug, skillId })
+        .then((result) => {
+          if (result) setScans((prev) => ({ ...prev, [skillId]: result }))
+        })
+        .catch(() => {
+          requestedScans.current.delete(skillId)
+        })
+    },
+    [scanRepoSkill, catalog.slug],
+  )
 
   // A catalog skill counts as installed when a local skill folder shares its
   // directory name — the name the install flow itself would use.
@@ -54,6 +89,15 @@ export function RepoBrowser({
               <span className="rounded-[7px] border border-[#27272a] bg-[#18181b] px-2.5 py-1 text-[11px] font-medium text-[#a1a1aa]">
                 Skill repo
               </span>
+              {catalog.stars !== undefined && (
+                <span
+                  title="GitHub stars — a reputation signal, not a safety score"
+                  className="flex items-center gap-1 rounded-[7px] border border-[#27272a] bg-[#18181b] px-2.5 py-1 text-[11px] font-medium text-[#a1a1aa]"
+                >
+                  <Star className="size-3 text-[#fbbf24]" />
+                  {formatStars(catalog.stars)}
+                </span>
+              )}
             </div>
             <p className="mt-1.5 max-w-[560px] font-mono text-[12px] text-[#71717a]">{catalog.url}</p>
           </div>
@@ -114,48 +158,15 @@ export function RepoBrowser({
           <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-2">
             {visible.map((skill) => {
               const dirName = skill.path.split('/').filter(Boolean).pop() ?? skill.name
-              const installed = installedDirs.has(dirName)
-              const colors = iconColorsFor(skill.id)
               return (
-                <div
+                <RepoSkillCard
                   key={skill.id}
-                  className="flex flex-col gap-3 rounded-[13px] border border-[#232328] bg-[#101013] p-4"
-                >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className="grid size-10 shrink-0 place-items-center rounded-[11px] font-mono text-[15px] font-semibold"
-                      style={{ background: colors.bg, color: colors.fg }}
-                    >
-                      {monoFor(skill.name)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <span className="block truncate text-[14.5px] font-semibold text-[#fafafa]">{skill.name}</span>
-                      <span className="mt-0.5 block truncate font-mono text-[11px] text-[#52525b]">
-                        {skill.path || '(repo root)'}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => onInstall(skill)}
-                      disabled={installed}
-                      className={`flex h-8 shrink-0 items-center gap-1.5 rounded-[9px] px-3 text-[12.5px] font-semibold transition ${
-                        installed
-                          ? 'cursor-default border border-[#1f3a24] bg-[#0f1a11] text-[#4ade80]'
-                          : 'bg-[#f97316] text-white hover:bg-[#ea580c]'
-                      }`}
-                    >
-                      {installed ? <Check className="size-3.5" /> : <Download className="size-3.5" />}
-                      {installed ? 'Installed' : 'Install'}
-                    </button>
-                  </div>
-                  <p className="line-clamp-2 min-h-[38px] text-[12.5px] leading-relaxed text-[#a1a1aa]">
-                    {skill.description || 'No description provided.'}
-                  </p>
-                  <span className="ml-auto flex items-center gap-1 font-mono text-[11px] text-[#52525b]">
-                    <FileText className="size-3" />
-                    {skill.fileCount} {skill.fileCount === 1 ? 'file' : 'files'}
-                  </span>
-                </div>
+                  skill={skill}
+                  installed={installedDirs.has(dirName)}
+                  scan={scans[skill.id]}
+                  requestScan={requestScan}
+                  onInstall={() => onInstall(skill)}
+                />
               )
             })}
           </div>
@@ -163,6 +174,99 @@ export function RepoBrowser({
       </div>
     </div>
   )
+}
+
+/**
+ * One installable catalog skill, with a pre-install security badge. The scan
+ * fetches the skill's files from GitHub, so it's deferred until the card scrolls
+ * into view (via IntersectionObserver) rather than fired for the whole repo.
+ */
+function RepoSkillCard({
+  skill,
+  installed,
+  scan,
+  requestScan,
+  onInstall,
+}: {
+  skill: RepoSkill
+  installed: boolean
+  scan?: SkillScan
+  requestScan: (skillId: string) => void
+  onInstall: () => void
+}) {
+  const cardRef = useRef<HTMLDivElement>(null)
+  const colors = iconColorsFor(skill.id)
+
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          requestScan(skill.id)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '150px' },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [skill.id, requestScan])
+
+  return (
+    <div
+      ref={cardRef}
+      className="flex flex-col gap-3 rounded-[13px] border border-[#232328] bg-[#101013] p-4"
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className="grid size-10 shrink-0 place-items-center rounded-[11px] font-mono text-[15px] font-semibold"
+          style={{ background: colors.bg, color: colors.fg }}
+        >
+          {monoFor(skill.name)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-[14.5px] font-semibold text-[#fafafa]">{skill.name}</span>
+            <TrustBadge scan={scan} variant="dot" />
+          </div>
+          <span className="mt-0.5 block truncate font-mono text-[11px] text-[#52525b]">
+            {skill.path || '(repo root)'}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={onInstall}
+          disabled={installed}
+          className={`flex h-8 shrink-0 items-center gap-1.5 rounded-[9px] px-3 text-[12.5px] font-semibold transition ${
+            installed
+              ? 'cursor-default border border-[#1f3a24] bg-[#0f1a11] text-[#4ade80]'
+              : 'bg-[#f97316] text-white hover:bg-[#ea580c]'
+          }`}
+        >
+          {installed ? <Check className="size-3.5" /> : <Download className="size-3.5" />}
+          {installed ? 'Installed' : 'Install'}
+        </button>
+      </div>
+      <p className="line-clamp-2 min-h-[38px] text-[12.5px] leading-relaxed text-[#a1a1aa]">
+        {skill.description || 'No description provided.'}
+      </p>
+      <div className="flex items-center gap-2">
+        <TrustBadge scan={scan} />
+        <span className="ml-auto flex items-center gap-1 font-mono text-[11px] text-[#52525b]">
+          <FileText className="size-3" />
+          {skill.fileCount} {skill.fileCount === 1 ? 'file' : 'files'}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/** Compact star count: 1234 → "1.2k", 12000 → "12k". */
+function formatStars(count: number): string {
+  if (count < 1000) return String(count)
+  const thousands = count / 1000
+  return `${thousands >= 10 ? Math.round(thousands) : thousands.toFixed(1)}k`
 }
 
 /**

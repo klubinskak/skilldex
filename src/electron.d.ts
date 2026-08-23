@@ -4,7 +4,10 @@ import type {
   CreateSkillInput,
   InstallRepoSkillInput,
   RepoCatalog,
+  ScanRepoSkillInput,
   SkillFile,
+  SkillScan,
+  SkillScanResult,
   WorkspaceConfig,
   WorkspaceSnapshot,
 } from '@/features/skills/model/skills'
@@ -31,6 +34,9 @@ declare global {
         removeSkillRepo(slug: string): Promise<RepoCatalog[]>
         refreshSkillRepo(slug: string): Promise<RepoCatalog[]>
         installRepoSkill(input: InstallRepoSkillInput): Promise<WorkspaceSnapshot>
+        scanSkill(id: string): Promise<SkillScanResult | null>
+        markSkillReviewed(id: string, reviewed: boolean): Promise<SkillScanResult | null>
+        scanRepoSkill(input: ScanRepoSkillInput): Promise<SkillScan>
       }
     }
   }

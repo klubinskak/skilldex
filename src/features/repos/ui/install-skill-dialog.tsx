@@ -1,32 +1,67 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Globe, Layers, Loader2, X } from 'lucide-react'
-import type { ProjectRecord, RepoSkill } from '@/features/skills/model/skills'
+import type { ProjectRecord, RepoSkill, ScanRepoSkillInput, SkillScan } from '@/features/skills/model/skills'
+import { SecurityFindings } from '@/features/skills/ui/security-findings'
+import { TrustBadge } from '@/features/skills/ui/trust-badge'
 
 type InstallSkillDialogProps = {
   /** The catalog skill being installed, or null when the dialog is closed. */
   skill: RepoSkill | null
   repoSlug: string
   projects: ProjectRecord[]
+  scanRepoSkill: (input: ScanRepoSkillInput) => Promise<SkillScan | null>
   onClose: () => void
   onInstall: (input: { scope: 'global' | 'project'; projectName?: string }) => Promise<void>
 }
 
-export function InstallSkillDialog({ skill, repoSlug, projects, onClose, onInstall }: InstallSkillDialogProps) {
+export function InstallSkillDialog({ skill, repoSlug, projects, scanRepoSkill, onClose, onInstall }: InstallSkillDialogProps) {
   const [scope, setScope] = useState<'global' | 'project'>('global')
   const [projectName, setProjectName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [scan, setScan] = useState<SkillScan | null>(null)
+  const [scanning, setScanning] = useState(false)
+  const [acknowledged, setAcknowledged] = useState(false)
+
+  // Scan the skill's files (fetched into memory, nothing written) as soon as the
+  // dialog opens, so the verdict is on screen before the user commits.
+  useEffect(() => {
+    if (!skill) return
+    let active = true
+    setScan(null)
+    setAcknowledged(false)
+    setScanning(true)
+    scanRepoSkill({ repo: repoSlug, skillId: skill.id })
+      .then((result) => {
+        if (active) setScan(result)
+      })
+      .catch(() => {
+        if (active) setScan(null) // scan failure never blocks; just no verdict
+      })
+      .finally(() => {
+        if (active) setScanning(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [skill, repoSlug, scanRepoSkill])
 
   if (!skill) return null
 
   const resolvedProject = projectName || projects[0]?.name || ''
   const canProject = projects.length > 0
-  const canSubmit = !submitting && (scope === 'global' || Boolean(resolvedProject))
+  const risky = scan !== null && scan.verdict !== 'green'
+  // Red/amber installs need a deliberate acknowledgement; green and scan-failed
+  // installs proceed normally (we never hard-block).
+  const canSubmit =
+    !submitting && !scanning && (scope === 'global' || Boolean(resolvedProject)) && (!risky || acknowledged)
 
   const close = () => {
     setScope('global')
     setProjectName('')
     setError(null)
+    setScan(null)
+    setAcknowledged(false)
     onClose()
   }
 
@@ -68,6 +103,27 @@ export function InstallSkillDialog({ skill, repoSlug, projects, onClose, onInsta
         </div>
 
         <div className="flex flex-col gap-4 px-6 py-5">
+          <div>
+            <div className="mb-1.5 flex items-center gap-2 text-[12.5px] font-medium text-[#d4d4d8]">
+              Security scan
+              {!scanning && <TrustBadge scan={scan} />}
+            </div>
+            <div className="max-h-[240px] overflow-y-auto rounded-xl border border-[#1c1c20] bg-[#0c0c0e] px-3.5 py-3">
+              <SecurityFindings scan={scan} loading={scanning} />
+            </div>
+            {risky && (
+              <label className="mt-2.5 flex cursor-pointer items-start gap-2 text-[12.5px] leading-relaxed text-[#d4d4d8]">
+                <input
+                  type="checkbox"
+                  checked={acknowledged}
+                  onChange={(event) => setAcknowledged(event.target.checked)}
+                  className="mt-0.5 size-3.5 shrink-0 accent-[#f97316]"
+                />
+                I&apos;ve reviewed the findings above and want to install this skill anyway.
+              </label>
+            )}
+          </div>
+
           <div>
             <div className="mb-1.5 text-[12.5px] font-medium text-[#d4d4d8]">Install to</div>
             <div className="grid grid-cols-2 gap-2.5">
@@ -119,12 +175,18 @@ export function InstallSkillDialog({ skill, repoSlug, projects, onClose, onInsta
             type="button"
             onClick={() => void submit()}
             disabled={!canSubmit}
-            className={`flex h-9 items-center gap-1.5 rounded-[9px] bg-[#f97316] px-[18px] text-[13px] font-semibold text-white transition ${
-              canSubmit ? 'hover:bg-[#ea580c]' : 'cursor-not-allowed opacity-60'
+            className={`flex h-9 items-center gap-1.5 rounded-[9px] px-[18px] text-[13px] font-semibold text-white transition ${
+              scan?.verdict === 'red' ? 'bg-[#dc2626]' : 'bg-[#f97316]'
+            } ${
+              canSubmit
+                ? scan?.verdict === 'red'
+                  ? 'hover:bg-[#b91c1c]'
+                  : 'hover:bg-[#ea580c]'
+                : 'cursor-not-allowed opacity-60'
             }`}
           >
             {submitting && <Loader2 className="size-3.5 animate-spin" />}
-            {submitting ? 'Installing…' : 'Install skill'}
+            {submitting ? 'Installing…' : scanning ? 'Scanning…' : 'Install skill'}
           </button>
         </div>
       </div>

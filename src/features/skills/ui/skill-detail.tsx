@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Check, Copy, ExternalLink, FolderOpen, Loader2, Pencil } from 'lucide-react'
-import { scopePillClass, type Skill, type SkillFile } from '../model/skills'
+import { ArrowLeft, Check, Copy, ExternalLink, FolderOpen, Loader2, Pencil, ShieldCheck } from 'lucide-react'
+import { scopePillClass, type Skill, type SkillFile, type SkillScanResult } from '../model/skills'
 import { CodeView } from './code-view'
 import { EditSkillDialog } from './edit-skill-dialog'
 import { FavouriteButton } from './favourite-button'
+import { SecurityFindings } from './security-findings'
 import { SkillToggle } from './skill-toggle'
+import { TrustBadge } from './trust-badge'
 
 type SkillDetailProps = {
   skill: Skill
+  scan?: SkillScanResult | null
+  requestScan: (id: string) => void
+  onMarkReviewed: (reviewed: boolean) => void
   getReadme: (id: string) => Promise<string | null>
   listFiles: (id: string) => Promise<SkillFile[] | null>
   reveal: (id: string) => Promise<boolean>
@@ -18,7 +23,7 @@ type SkillDetailProps = {
   onBack: () => void
 }
 
-type Tab = 'instructions' | 'files' | 'activity'
+type Tab = 'instructions' | 'files' | 'security' | 'activity'
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -26,7 +31,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export function SkillDetail({ skill, getReadme, listFiles, reveal, onToggle, onToggleFavourite, onSave, onRemove, onBack }: SkillDetailProps) {
+export function SkillDetail({ skill, scan, requestScan, onMarkReviewed, getReadme, listFiles, reveal, onToggle, onToggleFavourite, onSave, onRemove, onBack }: SkillDetailProps) {
   const [tab, setTab] = useState<Tab>('instructions')
   const [readme, setReadme] = useState<string | null>(null)
   const [files, setFiles] = useState<SkillFile[] | null>(null)
@@ -35,6 +40,11 @@ export function SkillDetail({ skill, getReadme, listFiles, reveal, onToggle, onT
   const [editing, setEditing] = useState(false)
   const [copied, setCopied] = useState(false)
   const manageable = skill.scope !== 'plugin'
+
+  // Kick off the (lazy, cached) security scan when this skill is opened.
+  useEffect(() => {
+    requestScan(skill.id)
+  }, [skill.id, requestScan])
 
   // Persist the edit, then reflect the new content in the Instructions tab
   // immediately (the dashboard snapshot refreshes the name/description).
@@ -103,6 +113,14 @@ export function SkillDetail({ skill, getReadme, listFiles, reveal, onToggle, onT
               >
                 {skill.scope}
               </span>
+              <button
+                type="button"
+                onClick={() => setTab('security')}
+                title="View the security scan"
+                className="cursor-pointer"
+              >
+                <TrustBadge scan={scan} />
+              </button>
             </div>
             <p className="mt-1.5 max-w-[620px] text-[14px] leading-relaxed text-[#a1a1aa]">{skill.summary}</p>
           </div>
@@ -126,7 +144,7 @@ export function SkillDetail({ skill, getReadme, listFiles, reveal, onToggle, onT
         </div>
 
         <div className="mt-5 flex gap-2 border-b border-[#1c1c20]">
-          {(['instructions', 'files', 'activity'] as const).map((key) => (
+          {(['instructions', 'files', 'security', 'activity'] as const).map((key) => (
             <button
               key={key}
               type="button"
@@ -172,6 +190,29 @@ export function SkillDetail({ skill, getReadme, listFiles, reveal, onToggle, onT
               ) : (
                 <p className="text-[13px] text-[#71717a]">No files found.</p>
               ))}
+
+            {tab === 'security' && (
+              <div className="flex flex-col gap-4">
+                <SecurityFindings scan={scan ?? null} loading={scan === undefined} />
+                {scan && scan.verdict !== 'green' && (
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-[#1c1c20] bg-[#0c0c0e] px-4 py-3">
+                    <p className="text-[12.5px] leading-relaxed text-[#71717a]">
+                      {scan.reviewed
+                        ? 'You marked this content as reviewed. Any edit re-runs the scan.'
+                        : 'Seen these findings and judged them safe? Mark it reviewed to clear the badge.'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => onMarkReviewed(!scan.reviewed)}
+                      className="flex h-9 shrink-0 items-center gap-1.5 rounded-[9px] border border-[#27272a] bg-[#18181b] px-3.5 text-[12.5px] font-medium text-[#e4e4e7] transition hover:border-[#3a3a42]"
+                    >
+                      <ShieldCheck className="size-3.5" />
+                      {scan.reviewed ? 'Undo review' : 'Mark reviewed'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {tab === 'activity' && (
               <p className="text-[13px] text-[#71717a]">Usage activity will appear here once tracking lands.</p>

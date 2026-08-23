@@ -1,17 +1,19 @@
 import { FolderGit2 } from 'lucide-react'
-import type { ProjectRecord, Skill } from '../model/skills'
+import type { ProjectRecord, Skill, SkillScanResult } from '../model/skills'
 import { SkillCard } from './skill-card'
 
 export type ProjectGroup = { project: ProjectRecord; skills: Skill[] }
 
 type ProjectGroupsProps = {
   groups: ProjectGroup[]
+  scans: Record<string, SkillScanResult>
+  onRequestScan: (id: string) => void
   onOpen: (id: string) => void
   onToggle: (skill: Skill) => void
   onToggleFavourite: (skill: Skill) => void
 }
 
-export function ProjectGroups({ groups, onOpen, onToggle, onToggleFavourite }: ProjectGroupsProps) {
+export function ProjectGroups({ groups, scans, onRequestScan, onOpen, onToggle, onToggleFavourite }: ProjectGroupsProps) {
   return (
     <div className="flex flex-col gap-9">
       {groups.map(({ project, skills }) => (
@@ -29,6 +31,8 @@ export function ProjectGroups({ groups, onOpen, onToggle, onToggleFavourite }: P
               <SkillCard
                 key={skill.id}
                 skill={skill}
+                scan={scans[skill.id]}
+                onRequestScan={() => onRequestScan(skill.id)}
                 onOpen={() => onOpen(skill.id)}
                 onToggle={() => onToggle(skill)}
                 onToggleFavourite={() => onToggleFavourite(skill)}

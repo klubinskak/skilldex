@@ -79,6 +79,10 @@ export function Dashboard() {
     toggleFavourite,
     updateReadme,
     create,
+    scans,
+    requestScan,
+    markReviewed,
+    scanRepoSkill,
     repoCatalogs,
     reposLoading,
     addRepo,
@@ -194,6 +198,7 @@ export function Dashboard() {
             localSkills={skills}
             configuredSlugs={repoCatalogs.map((repo) => repo.slug)}
             busy={reposLoading}
+            scanRepoSkill={scanRepoSkill}
             onRefresh={() => void refreshRepo(activeCatalog.slug).catch(() => {})}
             onRemove={() => {
               setActiveRepo(null)
@@ -205,6 +210,9 @@ export function Dashboard() {
         ) : selected ? (
           <SkillDetail
             skill={selected}
+            scan={scans[selected.id]}
+            requestScan={requestScan}
+            onMarkReviewed={(reviewed) => void markReviewed(selected.id, reviewed)}
             getReadme={getReadme}
             listFiles={listFiles}
             reveal={reveal}
@@ -298,6 +306,8 @@ export function Dashboard() {
               ) : projectGroups && projectGroups.length > 0 ? (
                 <ProjectGroups
                   groups={projectGroups}
+                  scans={scans}
+                  onRequestScan={requestScan}
                   onOpen={(id) => setSelectedId(id)}
                   onToggle={(skill) => void toggleSkill(skill)}
                   onToggleFavourite={(skill) => favourite(skill)}
@@ -308,6 +318,8 @@ export function Dashboard() {
                     <SkillCard
                       key={skill.id}
                       skill={skill}
+                      scan={scans[skill.id]}
+                      onRequestScan={() => requestScan(skill.id)}
                       onOpen={() => setSelectedId(skill.id)}
                       onToggle={() => void toggleSkill(skill)}
                       onToggleFavourite={() => favourite(skill)}
@@ -350,6 +362,7 @@ export function Dashboard() {
         skill={installTarget}
         repoSlug={activeRepo ?? ''}
         projects={snapshot.projects}
+        scanRepoSkill={scanRepoSkill}
         onClose={() => setInstallTarget(null)}
         onInstall={async ({ scope, projectName }) => {
           if (!installTarget || !activeRepo) return

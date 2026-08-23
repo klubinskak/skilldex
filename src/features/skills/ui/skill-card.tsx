@@ -1,17 +1,27 @@
+import { useEffect } from 'react'
 import { FileText } from 'lucide-react'
-import { scopePillClass, type Skill } from '../model/skills'
+import { scopePillClass, type Skill, type SkillScanResult } from '../model/skills'
 import { FavouriteButton } from './favourite-button'
 import { SkillToggle } from './skill-toggle'
+import { TrustBadge } from './trust-badge'
 
 type SkillCardProps = {
   skill: Skill
+  scan?: SkillScanResult
+  onRequestScan?: () => void
   onOpen: () => void
   onToggle: () => void
   onToggleFavourite: () => void
 }
 
-export function SkillCard({ skill, onOpen, onToggle, onToggleFavourite }: SkillCardProps) {
+export function SkillCard({ skill, scan, onRequestScan, onOpen, onToggle, onToggleFavourite }: SkillCardProps) {
   const chips = skill.scope === 'project' ? skill.projects.slice(0, 2) : []
+
+  // Lazily scan when the card first appears; the hook dedupes and caches, and
+  // the main process caches by content hash, so this stays cheap on re-renders.
+  useEffect(() => {
+    onRequestScan?.()
+  }, [onRequestScan])
 
   return (
     <div
@@ -41,6 +51,7 @@ export function SkillCard({ skill, onOpen, onToggle, onToggleFavourite }: SkillC
             >
               {skill.scope}
             </span>
+            <TrustBadge scan={scan} variant="dot" />
           </div>
           <div className="mt-0.5 truncate font-mono text-[11px] text-[#52525b]">{skill.source}</div>
         </div>
