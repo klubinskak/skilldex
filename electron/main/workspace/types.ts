@@ -94,6 +94,24 @@ export type WorkspaceSnapshot = {
   homeDir: string
 }
 
+export type SkillUsageEvent = {
+  /** ISO timestamp the skill was invoked at. */
+  timestamp: string
+  /** Working directory of the session that invoked it. */
+  cwd: string
+}
+
+/**
+ * Actual invocations of a skill (by name — see `skill-usage.ts`), derived from
+ * Claude Code's own session transcripts.
+ */
+export type SkillUsage = {
+  count: number
+  lastUsedAt: string
+  /** Most recent invocations first, capped to a small window. */
+  recent: SkillUsageEvent[]
+}
+
 export type WorkspaceConfig = {
   includePersonal: boolean
   includePlugins: boolean
