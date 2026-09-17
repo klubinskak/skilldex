@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, nativeImage, shell } from 'electro
 import { existsSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { setupAutoUpdates } from './updater'
 import { createConfigStore } from './workspace/config'
 import { createSkillWorkspace } from './workspace/skill-workspace'
 import type {
@@ -95,6 +96,7 @@ app.whenReady().then(() => {
   )
 
   createMainWindow()
+  setupAutoUpdates()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
