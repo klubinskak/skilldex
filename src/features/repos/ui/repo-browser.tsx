@@ -17,6 +17,8 @@ type RepoBrowserProps = {
   localSkills: Skill[]
   /** Slugs of every configured repo, so linked repos already added show as such. */
   configuredSlugs: string[]
+  /** The sidebar's search query — shared with every other view, no separate filter box here. */
+  query: string
   busy: boolean
   scanRepoSkill: (input: ScanRepoSkillInput) => Promise<SkillScan | null>
   onRefresh: () => void
@@ -29,6 +31,7 @@ export function RepoBrowser({
   catalog,
   localSkills,
   configuredSlugs,
+  query,
   busy,
   scanRepoSkill,
   onRefresh,
@@ -36,8 +39,6 @@ export function RepoBrowser({
   onInstall,
   onAddLinked,
 }: RepoBrowserProps) {
-  const [query, setQuery] = useState('')
-
   // Lazy, per-skill pre-install scans, cached by catalog-skill id. Only skills
   // scrolled into view are fetched+scanned, so a huge repo never triggers a
   // storm of network reads. Cleared when the browsed repo changes.
@@ -122,18 +123,10 @@ export function RepoBrowser({
         </div>
 
         {!isIndexRepo && !catalog.error && (
-          <div className="mt-5 flex items-center gap-3 border-b border-[#1c1c20] pb-3">
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Filter skills…"
-              className="h-[32px] w-[260px] rounded-[9px] border border-[#27272a] bg-[#111114] px-3 text-[13px] text-[#e4e4e7] outline-none placeholder:text-[#52525b] focus:border-[#3a3a42]"
-            />
-            <span className="text-[12px] text-[#52525b]">
-              {catalog.skills.length} {catalog.skills.length === 1 ? 'skill' : 'skills'} on{' '}
-              <span className="font-mono">{catalog.ref}</span>
-              {catalog.truncated ? ' (listing truncated — very large repo)' : ''}
-            </span>
+          <div className="mt-5 border-b border-[#1c1c20] pb-3 text-[12px] text-[#52525b]">
+            {catalog.skills.length} {catalog.skills.length === 1 ? 'skill' : 'skills'} on{' '}
+            <span className="font-mono">{catalog.ref}</span>
+            {catalog.truncated ? ' (listing truncated — very large repo)' : ''}
           </div>
         )}
       </div>
