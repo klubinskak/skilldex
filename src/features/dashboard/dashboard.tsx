@@ -96,6 +96,7 @@ export function Dashboard() {
   const [showCreate, setShowCreate] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [activeRepo, setActiveRepo] = useState<string | null>(null)
+  const [activeProject, setActiveProject] = useState<string | null>(null)
   const [showAddRepo, setShowAddRepo] = useState(false)
   const [installTarget, setInstallTarget] = useState<RepoSkill | null>(null)
 
@@ -166,13 +167,16 @@ export function Dashboard() {
   // In the Project tab, organize the (already search-filtered) skills by project.
   const projectGroups = useMemo(() => {
     if (filter !== 'project') return null
-    return snapshot.projects
+    const groups = snapshot.projects
       .map((project) => ({ project, skills: visibleSkills.filter((skill) => skill.projects.includes(project.name)) }))
       .filter((group) => group.skills.length > 0)
-  }, [filter, snapshot.projects, visibleSkills])
+    return activeProject ? groups.filter((group) => group.project.name === activeProject) : groups
+  }, [filter, snapshot.projects, visibleSkills, activeProject])
 
   const selected = selectedId ? skills.find((skill) => skill.id === selectedId) ?? null : null
-  const heading = HEADINGS[filter]
+  const heading = activeProject
+    ? { title: activeProject, subtitle: `Skills available in ${activeProject}.`, pill: 'Project' }
+    : HEADINGS[filter]
   const activeCatalog = activeRepo ? repoCatalogs.find((repo) => repo.slug === activeRepo) ?? null : null
 
   return (
@@ -183,10 +187,12 @@ export function Dashboard() {
         projects={snapshot.projects}
         repos={repoCatalogs}
         activeRepo={activeRepo}
+        activeProject={activeProject}
         query={query}
         onQuery={setQuery}
-        onFilter={(key) => { setFilter(key); setSelectedId(null); setActiveRepo(null) }}
-        onSelectRepo={(slug) => { setActiveRepo(slug); setSelectedId(null) }}
+        onFilter={(key) => { setFilter(key); setSelectedId(null); setActiveRepo(null); setActiveProject(null) }}
+        onSelectRepo={(slug) => { setActiveRepo(slug); setSelectedId(null); setActiveProject(null) }}
+        onSelectProject={(name) => { setActiveProject(name); setFilter('project'); setSelectedId(null); setActiveRepo(null) }}
         onAddRepo={() => setShowAddRepo(true)}
         onOpenSettings={() => setShowSettings(true)}
       />
@@ -254,7 +260,7 @@ export function Dashboard() {
                     <button
                       key={item.key}
                       type="button"
-                      onClick={() => setFilter(item.key)}
+                      onClick={() => { setFilter(item.key); setActiveProject(null) }}
                       className={`-mb-px border-b-2 px-1 pb-2.5 text-[13px] transition ${
                         active ? 'border-[#f97316] font-semibold text-[#fafafa]' : 'border-transparent font-medium text-[#71717a]'
                       }`}
@@ -294,7 +300,9 @@ export function Dashboard() {
                   {query
                     ? `No skills match “${query}”.`
                     : filter === 'project'
-                      ? 'No project skills yet. Add a project folder in Settings.'
+                      ? activeProject
+                        ? `No skills in ${activeProject} yet.`
+                        : 'No project skills yet. Add a project folder in Settings.'
                       : filter === 'disabled'
                         ? 'No disabled skills. Everything is switched on.'
                         : filter === 'favourites'

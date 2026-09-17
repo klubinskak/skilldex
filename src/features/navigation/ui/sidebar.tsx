@@ -13,10 +13,13 @@ type SidebarProps = {
   repos: RepoCatalog[]
   /** Slug of the repo whose catalog fills the main pane, if any. */
   activeRepo: string | null
+  /** Name of the project whose skills fill the main pane, if any. */
+  activeProject: string | null
   query: string
   onQuery: (value: string) => void
   onFilter: (key: FilterKey) => void
   onSelectRepo: (slug: string) => void
+  onSelectProject: (name: string) => void
   onAddRepo: () => void
   onOpenSettings: () => void
 }
@@ -31,7 +34,7 @@ const NAV: Array<{ key: FilterKey; label: string; icon: ComponentType<{ classNam
   { key: 'disabled', label: 'Disabled', icon: PowerOff },
 ]
 
-export function Sidebar({ active, counts, projects, repos, activeRepo, query, onQuery, onFilter, onSelectRepo, onAddRepo, onOpenSettings }: SidebarProps) {
+export function Sidebar({ active, counts, projects, repos, activeRepo, activeProject, query, onQuery, onFilter, onSelectRepo, onSelectProject, onAddRepo, onOpenSettings }: SidebarProps) {
   return (
     <aside className="flex w-[248px] shrink-0 flex-col border-r border-[#1c1c20] bg-[#0b0b0d] px-3 py-3.5">
       <div className="flex items-center gap-2.5 px-2 pb-3.5 pt-1.5">
@@ -58,7 +61,7 @@ export function Sidebar({ active, counts, projects, repos, activeRepo, query, on
       <nav className="flex flex-col gap-0.5">
         {NAV.map((item) => {
           const Icon = item.icon
-          const isActive = active === item.key && activeRepo === null
+          const isActive = active === item.key && activeRepo === null && activeProject === null
           return (
             <button
               key={item.key}
@@ -138,19 +141,30 @@ export function Sidebar({ active, counts, projects, repos, activeRepo, query, on
             No project sources yet. Add a project folder in Settings.
           </p>
         ) : (
-          projects.map((project, index) => (
-            <div
-              key={project.path}
-              className="flex items-center gap-3 rounded-[9px] px-2 py-1.5 text-[13px] text-[#a1a1aa]"
-            >
-              <span
-                className="size-2 shrink-0 rounded-[3px]"
-                style={{ background: ACCENT_PALETTE[index % ACCENT_PALETTE.length] }}
-              />
-              <span className="flex-1 truncate">{project.name}</span>
-              <span className="font-mono text-[11px] text-[#52525b]">{project.skillCount}</span>
-            </div>
-          ))
+          projects.map((project, index) => {
+            const isActive = activeProject === project.name
+            return (
+              <button
+                key={project.path}
+                type="button"
+                onClick={() => onSelectProject(project.name)}
+                className={`flex items-center gap-3 rounded-[9px] px-2 py-1.5 text-[13px] font-medium transition ${
+                  isActive
+                    ? 'bg-[#1a1109] text-[#fb923c] shadow-[inset_2px_0_0_#f97316]'
+                    : 'text-[#a1a1aa] hover:bg-[#141417]'
+                }`}
+              >
+                <span
+                  className="size-2 shrink-0 rounded-[3px]"
+                  style={{ background: ACCENT_PALETTE[index % ACCENT_PALETTE.length] }}
+                />
+                <span className="flex-1 truncate text-left">{project.name}</span>
+                <span className={`font-mono text-[11px] ${isActive ? 'text-[#fb923c]' : 'text-[#52525b]'}`}>
+                  {project.skillCount}
+                </span>
+              </button>
+            )
+          })
         )}
       </div>
 
