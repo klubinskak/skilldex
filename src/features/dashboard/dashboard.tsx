@@ -201,6 +201,7 @@ export function Dashboard() {
         {activeCatalog ? (
           <RepoBrowser
             catalog={activeCatalog}
+            query={query}
             localSkills={skills}
             configuredSlugs={repoCatalogs.map((repo) => repo.slug)}
             busy={reposLoading}
