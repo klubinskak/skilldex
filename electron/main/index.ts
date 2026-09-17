@@ -94,6 +94,7 @@ app.whenReady().then(() => {
   ipcMain.handle('skilldex:scan-repo-skill', (_event, input: ScanRepoSkillInput) =>
     workspace.scanRepoSkill(input),
   )
+  ipcMain.handle('skilldex:get-skill-usage', () => workspace.getSkillUsage())
 
   createMainWindow()
   setupAutoUpdates()

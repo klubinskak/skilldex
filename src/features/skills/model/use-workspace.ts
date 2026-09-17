@@ -10,6 +10,7 @@ import {
   type SkillFile,
   type SkillScan,
   type SkillScanResult,
+  type SkillUsage,
   type WorkspaceConfig,
   type WorkspaceSnapshot,
 } from './skills'
@@ -46,6 +47,9 @@ export type WorkspaceState = {
   removeRepo: (slug: string) => Promise<void>
   refreshRepo: (slug: string) => Promise<void>
   installRepoSkill: (input: InstallRepoSkillInput) => Promise<WorkspaceSnapshot | null>
+  /** Actual invocation counts by skill name, read from Claude Code session transcripts. */
+  usage: Record<string, SkillUsage>
+  usageLoading: boolean
 }
 
 const bridge = () => (typeof window !== 'undefined' ? window.skilldex?.workspace : undefined)
@@ -58,6 +62,8 @@ export function useWorkspace(): WorkspaceState {
   const [repoCatalogs, setRepoCatalogs] = useState<RepoCatalog[]>([])
   const [reposLoading, setReposLoading] = useState(false)
   const [scans, setScans] = useState<Record<string, SkillScanResult>>({})
+  const [usage, setUsage] = useState<Record<string, SkillUsage>>({})
+  const [usageLoading, setUsageLoading] = useState(true)
   // Ids already scanned or in flight — dedupes the lazy per-skill scan requests.
   const requestedScans = useRef<Set<string>>(new Set())
 
@@ -221,6 +227,14 @@ export function useWorkspace(): WorkspaceState {
       .then(setRepoCatalogs)
       .catch(() => {})
       .finally(() => setReposLoading(false))
+    // Usage reads Claude Code's session transcripts from disk — independent of
+    // both the above, so a large transcript history never blocks the library.
+    setUsageLoading(true)
+    bridge()
+      ?.getSkillUsage()
+      .then(setUsage)
+      .catch(() => {})
+      .finally(() => setUsageLoading(false))
   }, [rescan])
 
   return {
@@ -251,5 +265,7 @@ export function useWorkspace(): WorkspaceState {
     removeRepo,
     refreshRepo,
     installRepoSkill,
+    usage,
+    usageLoading,
   }
 }

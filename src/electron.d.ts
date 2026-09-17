@@ -8,6 +8,7 @@ import type {
   SkillFile,
   SkillScan,
   SkillScanResult,
+  SkillUsage,
   WorkspaceConfig,
   WorkspaceSnapshot,
 } from '@/features/skills/model/skills'
@@ -37,6 +38,7 @@ declare global {
         scanSkill(id: string): Promise<SkillScanResult | null>
         markSkillReviewed(id: string, reviewed: boolean): Promise<SkillScanResult | null>
         scanRepoSkill(input: ScanRepoSkillInput): Promise<SkillScan>
+        getSkillUsage(): Promise<Record<string, SkillUsage>>
       }
     }
   }

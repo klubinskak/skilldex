@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Check, Copy, ExternalLink, FolderOpen, Loader2, Pencil, ShieldCheck } from 'lucide-react'
-import { scopePillClass, type Skill, type SkillFile, type SkillScanResult } from '../model/skills'
+import { ArrowLeft, Check, Copy, ExternalLink, FolderOpen, Loader2, Pencil, ShieldCheck, Zap } from 'lucide-react'
+import { scopePillClass, tildify, type Skill, type SkillFile, type SkillScanResult, type SkillUsage } from '../model/skills'
 import { CodeView } from './code-view'
 import { EditSkillDialog } from './edit-skill-dialog'
 import { FavouriteButton } from './favourite-button'
@@ -11,6 +11,10 @@ import { TrustBadge } from './trust-badge'
 type SkillDetailProps = {
   skill: Skill
   scan?: SkillScanResult | null
+  /** Actual invocations, matched by skill name, from Claude Code session transcripts. */
+  usage: SkillUsage | null
+  usageLoading: boolean
+  homeDir: string
   requestScan: (id: string) => void
   onMarkReviewed: (reviewed: boolean) => void
   getReadme: (id: string) => Promise<string | null>
@@ -31,7 +35,19 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export function SkillDetail({ skill, scan, requestScan, onMarkReviewed, getReadme, listFiles, reveal, onToggle, onToggleFavourite, onSave, onRemove, onBack }: SkillDetailProps) {
+function formatRelativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const minutes = Math.round(diffMs / 60_000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes} min${minutes === 1 ? '' : 's'} ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`
+  const days = Math.round(hours / 24)
+  if (days < 30) return `${days} day${days === 1 ? '' : 's'} ago`
+  return new Date(iso).toLocaleDateString()
+}
+
+export function SkillDetail({ skill, scan, usage, usageLoading, homeDir, requestScan, onMarkReviewed, getReadme, listFiles, reveal, onToggle, onToggleFavourite, onSave, onRemove, onBack }: SkillDetailProps) {
   const [tab, setTab] = useState<Tab>('instructions')
   const [readme, setReadme] = useState<string | null>(null)
   const [files, setFiles] = useState<SkillFile[] | null>(null)
@@ -215,7 +231,7 @@ export function SkillDetail({ skill, scan, requestScan, onMarkReviewed, getReadm
             )}
 
             {tab === 'activity' && (
-              <p className="text-[13px] text-[#71717a]">Usage activity will appear here once tracking lands.</p>
+              <SkillActivity usage={usage} loading={usageLoading} homeDir={homeDir} skillName={skill.name} />
             )}
           </div>
         )}
@@ -314,6 +330,72 @@ export function SkillDetail({ skill, scan, requestScan, onMarkReviewed, getReadm
         onClose={() => setEditing(false)}
         onSave={saveReadme}
       />
+    </div>
+  )
+}
+
+/**
+ * Actual usage, read from Claude Code session transcripts and matched by
+ * skill name — see `electron/main/workspace/skill-usage.ts`. A name match
+ * (not a path) means two installed skills sharing a name are counted
+ * together, which the empty/populated copy below calls out.
+ */
+function SkillActivity({
+  usage,
+  loading,
+  homeDir,
+  skillName,
+}: {
+  usage: SkillUsage | null
+  loading: boolean
+  homeDir: string
+  skillName: string
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-[13px] text-[#71717a]">
+        <Loader2 className="size-4 animate-spin" /> Reading session history…
+      </div>
+    )
+  }
+
+  if (!usage || usage.count === 0) {
+    return (
+      <p className="text-[13px] text-[#71717a]">
+        No recorded invocations yet. This fills in once Claude actually calls this skill in a session.
+      </p>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-6 rounded-xl border border-[#1c1c20] bg-[#0c0c0e] px-4 py-3.5">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.08em] text-[#52525b]">Invocations</div>
+          <div className="mt-0.5 text-[20px] font-semibold text-[#fafafa]">{usage.count}</div>
+        </div>
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.08em] text-[#52525b]">Last used</div>
+          <div className="mt-0.5 text-[14px] font-medium text-[#e4e4e7]">{formatRelativeTime(usage.lastUsedAt)}</div>
+        </div>
+      </div>
+
+      <div className="divide-y divide-[#17171a] overflow-hidden rounded-xl border border-[#1c1c20] bg-[#0c0c0e]">
+        {usage.recent.map((event, index) => (
+          <div key={`${event.timestamp}-${index}`} className="flex items-center gap-2.5 px-4 py-2.5">
+            <Zap className="size-3.5 shrink-0 text-[#52525b]" />
+            <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-[#a1a1aa]">
+              {tildify(event.cwd, homeDir) || '(unknown project)'}
+            </span>
+            <span className="shrink-0 text-[11.5px] text-[#52525b]">{formatRelativeTime(event.timestamp)}</span>
+          </div>
+        ))}
+      </div>
+
+      <p className="text-[12px] leading-relaxed text-[#52525b]">
+        Counts every session where a skill named “{skillName}” was invoked — matched by name, not by folder, so
+        another installed skill sharing this name is counted together with it.
+      </p>
     </div>
   )
 }

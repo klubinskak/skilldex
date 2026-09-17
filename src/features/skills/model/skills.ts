@@ -75,6 +75,18 @@ export type ScanRepoSkillInput = {
   skillId: string
 }
 
+export type SkillUsageEvent = {
+  timestamp: string
+  cwd: string
+}
+
+/** Actual invocations of a skill (matched by name), read from session transcripts. */
+export type SkillUsage = {
+  count: number
+  lastUsedAt: string
+  recent: SkillUsageEvent[]
+}
+
 /** Presentation for a verdict badge: label, dot colour, and pill classes. */
 export function verdictMeta(verdict: ScanVerdict): {
   label: string

@@ -89,6 +89,8 @@ export function Dashboard() {
     removeRepo,
     refreshRepo,
     installRepoSkill,
+    usage,
+    usageLoading,
   } = useWorkspace()
   const [filter, setFilter] = useState<FilterKey>('all')
   const [query, setQuery] = useState('')
@@ -217,6 +219,9 @@ export function Dashboard() {
           <SkillDetail
             skill={selected}
             scan={scans[selected.id]}
+            usage={usage[selected.name] ?? null}
+            usageLoading={usageLoading}
+            homeDir={snapshot.homeDir}
             requestScan={requestScan}
             onMarkReviewed={(reviewed) => void markReviewed(selected.id, reviewed)}
             getReadme={getReadme}
