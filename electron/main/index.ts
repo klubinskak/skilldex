@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, nativeImage, shell } from 'electro
 import { existsSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { checkForUpdate, fetchLatestMacYml, isReleaseUrl, type UpdateInfo } from './update-check'
+import { createUpdateChecker, fetchLatestMacYml, isReleaseUrl } from './update-check'
 import { setupAutoUpdates } from './updater'
 import { createModCatalog } from './mods/mod-catalog'
 import { createConfigStore } from './workspace/config'
@@ -101,14 +101,14 @@ app.whenReady().then(() => {
   // signed app, so there the sidebar only says a new version is out.
   // SKILLDEX_PREVIEW_UPDATE=1 shows the card in dev, against the real latest release.
   const previewUpdate = process.env.SKILLDEX_PREVIEW_UPDATE === '1'
-  let updateCheck: Promise<(UpdateInfo & { currentVersion: string }) | null> | null = null
-  ipcMain.handle('skilldex:check-for-update', () => {
+  const updates = createUpdateChecker({
+    currentVersion: previewUpdate ? '0.0.0' : app.getVersion(),
+    fetchLatest: fetchLatestMacYml,
+  })
+  ipcMain.handle('skilldex:check-for-update', async () => {
     if (!previewUpdate && (!app.isPackaged || process.platform !== 'darwin')) return null
-    const currentVersion = previewUpdate ? '0.0.0' : app.getVersion()
-    updateCheck ??= checkForUpdate({ currentVersion, fetchLatest: fetchLatestMacYml }).then((update) =>
-      update ? { ...update, currentVersion: app.getVersion() } : null,
-    )
-    return updateCheck
+    const update = await updates.check()
+    return update ? { ...update, currentVersion: app.getVersion() } : null
   })
   ipcMain.handle('skilldex:open-release', async (_event, url: unknown) => {
     if (!isReleaseUrl(url)) return false

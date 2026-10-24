@@ -58,19 +58,59 @@ export async function checkForUpdate({
   currentVersion: string
   fetchLatest: () => Promise<unknown>
 }): Promise<UpdateInfo | null> {
-  try {
-    const latest = parseLatestMacYml(await fetchLatest())
-    return latest && isNewer(latest.version, currentVersion) ? latest : null
-  } catch {
-    // Offline, rate-limited or GitHub down: no card, try again next launch.
-    return null
+  // Throws when the feed can't be read, so callers can tell "no update" from "couldn't check".
+  const latest = parseLatestMacYml(await fetchLatest())
+  if (!latest) throw new Error('latest-mac.yml has no readable version')
+  return isNewer(latest.version, currentVersion) ? latest : null
+}
+
+// A real answer (update or not) is reused for an hour, so re-checking on every
+// window focus doesn't hit GitHub each time.
+const ANSWER_TTL_MS = 60 * 60 * 1000
+
+/**
+ * The app asks this on launch, on window focus and every few hours. A failed
+ * check (offline, timeout, GitHub down) is logged and not remembered, so the
+ * next ask tries again instead of hiding the card until the app restarts.
+ */
+export function createUpdateChecker({
+  currentVersion,
+  fetchLatest,
+  now = Date.now,
+  log = (error: unknown) => console.error('[update-check]', error),
+}: {
+  currentVersion: string
+  fetchLatest: () => Promise<unknown>
+  now?: () => number
+  log?: (error: unknown) => void
+}) {
+  let answer: { update: UpdateInfo | null; at: number } | null = null
+  let inFlight: Promise<UpdateInfo | null> | null = null
+
+  return {
+    check(): Promise<UpdateInfo | null> {
+      if (answer && now() - answer.at < ANSWER_TTL_MS) return Promise.resolve(answer.update)
+      inFlight ??= checkForUpdate({ currentVersion, fetchLatest })
+        .then((update) => {
+          answer = { update, at: now() }
+          return update
+        })
+        .catch((error: unknown) => {
+          log(error)
+          return null
+        })
+        .finally(() => {
+          inFlight = null
+        })
+      return inFlight
+    },
   }
 }
 
 export async function fetchLatestMacYml(): Promise<string> {
   const response = await fetch(LATEST_MAC_YML, {
     headers: { 'User-Agent': 'Skilldex' },
-    signal: AbortSignal.timeout(8000),
+    signal: AbortSignal.timeout(15_000),
   })
   if (!response.ok) throw new Error(`GitHub answered ${response.status}`)
   return response.text()

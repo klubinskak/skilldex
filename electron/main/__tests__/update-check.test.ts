@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { checkForUpdate, isNewer, isReleaseUrl, parseLatestMacYml } from '../update-check'
+import { describe, expect, it, vi } from 'vitest'
+import { checkForUpdate, createUpdateChecker, isNewer, isReleaseUrl, parseLatestMacYml } from '../update-check'
 
 const RELEASES = 'https://github.com/klubinskak/skilldex/releases'
 
@@ -76,10 +76,46 @@ describe('checkForUpdate', () => {
     expect(await checkForUpdate({ currentVersion: '0.3.0', fetchLatest: async () => yml })).toBeNull()
   })
 
-  it('returns null instead of throwing when offline', async () => {
-    const offline = async () => {
-      throw new Error('getaddrinfo ENOTFOUND github.com')
-    }
-    expect(await checkForUpdate({ currentVersion: '0.2.0', fetchLatest: offline })).toBeNull()
+  it('throws when the feed is unreadable, so a failure is not mistaken for "no update"', async () => {
+    await expect(checkForUpdate({ currentVersion: '0.2.0', fetchLatest: async () => 'Not Found' })).rejects.toThrow()
+  })
+})
+
+describe('createUpdateChecker', () => {
+  const offline = async () => {
+    throw new Error('getaddrinfo ENOTFOUND github.com')
+  }
+
+  it('logs a failed check, returns null, and tries again on the next ask', async () => {
+    const log = vi.fn()
+    const fetchLatest = vi.fn().mockImplementationOnce(offline).mockResolvedValue(yml)
+    const checker = createUpdateChecker({ currentVersion: '0.2.0', fetchLatest, log })
+
+    expect(await checker.check()).toBeNull()
+    expect(log).toHaveBeenCalledOnce()
+    expect((await checker.check())?.version).toBe('0.3.0')
+    expect(fetchLatest).toHaveBeenCalledTimes(2)
+  })
+
+  it('reuses a real answer for an hour, then asks GitHub again', async () => {
+    let time = 0
+    const fetchLatest = vi.fn().mockResolvedValue(yml)
+    const checker = createUpdateChecker({ currentVersion: '0.3.0', fetchLatest, now: () => time })
+
+    expect(await checker.check()).toBeNull()
+    time = 59 * 60 * 1000
+    expect(await checker.check()).toBeNull()
+    expect(fetchLatest).toHaveBeenCalledTimes(1)
+    time = 61 * 60 * 1000
+    await checker.check()
+    expect(fetchLatest).toHaveBeenCalledTimes(2)
+  })
+
+  it('shares one request between asks that arrive at the same time', async () => {
+    const fetchLatest = vi.fn().mockResolvedValue(yml)
+    const checker = createUpdateChecker({ currentVersion: '0.2.0', fetchLatest })
+
+    await Promise.all([checker.check(), checker.check()])
+    expect(fetchLatest).toHaveBeenCalledTimes(1)
   })
 })
