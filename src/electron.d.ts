@@ -11,6 +11,7 @@ import type {
   WorkspaceConfig,
   WorkspaceSnapshot,
 } from '@/features/skills/model/skills'
+import type { AvailableUpdate } from '@/features/updates/model/use-update'
 
 declare global {
   interface Window {
@@ -37,6 +38,10 @@ declare global {
         scanSkill(id: string): Promise<SkillScanResult | null>
         markSkillReviewed(id: string, reviewed: boolean): Promise<SkillScanResult | null>
         scanRepoSkill(input: ScanRepoSkillInput): Promise<SkillScan>
+      }
+      updates: {
+        check(): Promise<AvailableUpdate | null>
+        openRelease(url: string): Promise<boolean>
       }
     }
   }

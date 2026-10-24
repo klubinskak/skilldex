@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, nativeImage, shell } from 'electro
 import { existsSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { checkForUpdate, fetchLatestMacYml, isReleaseUrl, type UpdateInfo } from './update-check'
 import { setupAutoUpdates } from './updater'
 import { createConfigStore } from './workspace/config'
 import { createSkillWorkspace } from './workspace/skill-workspace'
@@ -94,6 +95,25 @@ app.whenReady().then(() => {
   ipcMain.handle('skilldex:scan-repo-skill', (_event, input: ScanRepoSkillInput) =>
     workspace.scanRepoSkill(input),
   )
+
+  // Windows and Linux update themselves (updater.ts). macOS can't without a
+  // signed app, so there the sidebar only says a new version is out.
+  // SKILLDEX_PREVIEW_UPDATE=1 shows the card in dev, against the real latest release.
+  const previewUpdate = process.env.SKILLDEX_PREVIEW_UPDATE === '1'
+  let updateCheck: Promise<(UpdateInfo & { currentVersion: string }) | null> | null = null
+  ipcMain.handle('skilldex:check-for-update', () => {
+    if (!previewUpdate && (!app.isPackaged || process.platform !== 'darwin')) return null
+    const currentVersion = previewUpdate ? '0.0.0' : app.getVersion()
+    updateCheck ??= checkForUpdate({ currentVersion, fetchLatest: fetchLatestMacYml }).then((update) =>
+      update ? { ...update, currentVersion: app.getVersion() } : null,
+    )
+    return updateCheck
+  })
+  ipcMain.handle('skilldex:open-release', async (_event, url: unknown) => {
+    if (!isReleaseUrl(url)) return false
+    await shell.openExternal(url)
+    return true
+  })
 
   createMainWindow()
   setupAutoUpdates()
