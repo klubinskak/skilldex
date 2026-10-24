@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import { AlertCircle, ListFilter, Loader2, Plus, RefreshCw } from 'lucide-react'
+import { useMods } from '@/features/mods/model/use-mods'
+import { ModsView } from '@/features/mods/ui/mods-view'
 import { Sidebar, type FilterKey, type SidebarCounts } from '@/features/navigation/ui/sidebar'
 import { AddRepoDialog } from '@/features/repos/ui/add-repo-dialog'
 import { InstallSkillDialog } from '@/features/repos/ui/install-skill-dialog'
@@ -90,6 +92,8 @@ export function Dashboard() {
     refreshRepo,
     installRepoSkill,
   } = useWorkspace()
+  const mods = useMods()
+  const [showMods, setShowMods] = useState(false)
   const [filter, setFilter] = useState<FilterKey>('all')
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -188,17 +192,22 @@ export function Dashboard() {
         repos={repoCatalogs}
         activeRepo={activeRepo}
         activeProject={activeProject}
+        modCount={mods.snapshot.mods.filter((mod) => mod.kind === 'installed').length}
+        modsActive={showMods}
         query={query}
         onQuery={setQuery}
-        onFilter={(key) => { setFilter(key); setSelectedId(null); setActiveRepo(null); setActiveProject(null) }}
-        onSelectRepo={(slug) => { setActiveRepo(slug); setSelectedId(null); setActiveProject(null) }}
-        onSelectProject={(name) => { setActiveProject(name); setFilter('project'); setSelectedId(null); setActiveRepo(null) }}
+        onFilter={(key) => { setFilter(key); setSelectedId(null); setActiveRepo(null); setActiveProject(null); setShowMods(false) }}
+        onSelectRepo={(slug) => { setActiveRepo(slug); setSelectedId(null); setActiveProject(null); setShowMods(false) }}
+        onSelectProject={(name) => { setActiveProject(name); setFilter('project'); setSelectedId(null); setActiveRepo(null); setShowMods(false) }}
         onAddRepo={() => setShowAddRepo(true)}
         onOpenSettings={() => setShowSettings(true)}
+        onOpenMods={() => { setShowMods(true); setSelectedId(null); setActiveRepo(null); setActiveProject(null) }}
       />
 
       <main className="relative flex min-w-0 flex-1 flex-col">
-        {activeCatalog ? (
+        {showMods ? (
+          <ModsView mods={mods} query={query} />
+        ) : activeCatalog ? (
           <RepoBrowser
             catalog={activeCatalog}
             localSkills={skills}

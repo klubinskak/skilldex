@@ -1,4 +1,4 @@
-import { AlertCircle, Blocks, Boxes, FolderGit2, Globe, Heart, LayoutGrid, Monitor, PackageSearch, Plus, PowerOff, Search, Settings, User } from 'lucide-react'
+import { AlertCircle, Blocks, Boxes, FolderGit2, Globe, Heart, LayoutGrid, Monitor, PackageSearch, Plus, PowerOff, Puzzle, Search, Settings, User } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { UpdateCard } from '@/features/updates/ui/update-card'
 import { ACCENT_PALETTE, type ProjectRecord, type RepoCatalog } from '@/features/skills/model/skills'
@@ -16,6 +16,10 @@ type SidebarProps = {
   activeRepo: string | null
   /** Name of the project whose skills fill the main pane, if any. */
   activeProject: string | null
+  /** Installed mods, for the Mods row count. */
+  modCount: number
+  /** Whether the Mods page fills the main pane. */
+  modsActive: boolean
   query: string
   onQuery: (value: string) => void
   onFilter: (key: FilterKey) => void
@@ -23,6 +27,7 @@ type SidebarProps = {
   onSelectProject: (name: string) => void
   onAddRepo: () => void
   onOpenSettings: () => void
+  onOpenMods: () => void
 }
 
 const NAV: Array<{ key: FilterKey; label: string; icon: ComponentType<{ className?: string }> }> = [
@@ -35,7 +40,7 @@ const NAV: Array<{ key: FilterKey; label: string; icon: ComponentType<{ classNam
   { key: 'disabled', label: 'Disabled', icon: PowerOff },
 ]
 
-export function Sidebar({ active, counts, projects, repos, activeRepo, activeProject, query, onQuery, onFilter, onSelectRepo, onSelectProject, onAddRepo, onOpenSettings }: SidebarProps) {
+export function Sidebar({ active, counts, projects, repos, activeRepo, activeProject, modCount, modsActive, query, onQuery, onFilter, onSelectRepo, onSelectProject, onAddRepo, onOpenSettings, onOpenMods }: SidebarProps) {
   return (
     <aside className="flex w-[248px] shrink-0 flex-col border-r border-[#1c1c20] bg-[#0b0b0d] px-3 py-3.5">
       <div className="flex items-center gap-2.5 px-2 pb-3.5 pt-1.5">
@@ -62,7 +67,7 @@ export function Sidebar({ active, counts, projects, repos, activeRepo, activePro
       <nav className="flex flex-col gap-0.5">
         {NAV.map((item) => {
           const Icon = item.icon
-          const isActive = active === item.key && activeRepo === null && activeProject === null
+          const isActive = active === item.key && activeRepo === null && activeProject === null && !modsActive
           return (
             <button
               key={item.key}
@@ -88,6 +93,23 @@ export function Sidebar({ active, counts, projects, repos, activeRepo, activePro
 
       {/* Repos and projects scroll, so the update card and footer always stay in view. */}
       <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-3">
+        <div className="px-2 pb-2 pt-5 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-[#52525b]">
+          Claude Code
+        </div>
+        <button
+          type="button"
+          onClick={onOpenMods}
+          className={`flex w-full items-center gap-3 rounded-[9px] px-2 py-2 text-[13.5px] font-medium transition ${
+            modsActive ? 'bg-[#1a1109] text-[#fb923c] shadow-[inset_2px_0_0_#f97316]' : 'text-[#a1a1aa] hover:bg-[#141417]'
+          }`}
+        >
+          <span className="flex w-[18px] justify-center">
+            <Puzzle className="size-[15px]" />
+          </span>
+          <span className="flex-1 text-left">Mods</span>
+          <span className={`font-mono text-[11px] ${modsActive ? 'text-[#fb923c]' : 'text-[#52525b]'}`}>{modCount}</span>
+        </button>
+
         <div className="flex items-center justify-between px-2 pb-2 pt-5">
           <span className="text-[10.5px] font-semibold uppercase tracking-[0.09em] text-[#52525b]">Skill Repos</span>
           <button

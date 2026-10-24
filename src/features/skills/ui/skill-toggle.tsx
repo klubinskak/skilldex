@@ -5,10 +5,12 @@ type SkillToggleProps = {
   onToggle?: () => void
   /** Manageable skills only — plugin skills render dimmed and inert. */
   disabled?: boolean
+  /** Why the toggle is inert; defaults to the plugin-skill explanation. */
+  disabledTitle?: string
 }
 
 /** On/off toggle reflecting a skill's enabled state; flips enable/disable when clicked. */
-export function SkillToggle({ enabled, size = 'sm', onToggle, disabled = false }: SkillToggleProps) {
+export function SkillToggle({ enabled, size = 'sm', onToggle, disabled = false, disabledTitle = 'Plugin skills are managed by their plugin' }: SkillToggleProps) {
   const track = size === 'lg' ? 'h-[23px] w-10' : 'h-5 w-[34px]'
   const knob = size === 'lg' ? 'size-[19px]' : 'size-4'
   const trackColor = enabled ? 'bg-[#22c55e]' : 'bg-[#3f3f46]'
@@ -21,7 +23,7 @@ export function SkillToggle({ enabled, size = 'sm', onToggle, disabled = false }
 
   if (!onToggle || disabled) {
     return (
-      <span aria-hidden title={disabled ? 'Plugin skills are managed by their plugin' : enabled ? 'Enabled' : 'Disabled'}>
+      <span aria-hidden title={disabled ? disabledTitle : enabled ? 'Enabled' : 'Disabled'}>
         {inner}
       </span>
     )
