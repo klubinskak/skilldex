@@ -12,6 +12,7 @@ import type {
   WorkspaceSnapshot,
 } from '@/features/skills/model/skills'
 import type { AvailableUpdate } from '@/features/updates/model/use-update'
+import type { ModDetail, ModsSnapshot } from '@/features/mods/model/mods'
 
 declare global {
   interface Window {
@@ -42,6 +43,12 @@ declare global {
       updates: {
         check(): Promise<AvailableUpdate | null>
         openRelease(url: string): Promise<boolean>
+      }
+      mods: {
+        list(): Promise<ModsSnapshot>
+        setEnabled(id: string, enabled: boolean): Promise<ModsSnapshot>
+        getDetail(id: string): Promise<ModDetail | null>
+        reveal(id: string): Promise<boolean>
       }
     }
   }

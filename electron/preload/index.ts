@@ -11,6 +11,7 @@ import type {
   WorkspaceSnapshot,
 } from '../main/workspace/types'
 import type { UpdateInfo } from '../main/update-check'
+import type { ModDetail, ModsSnapshot } from '../main/mods/types'
 
 contextBridge.exposeInMainWorld('skilldex', {
   workspace: {
@@ -53,5 +54,12 @@ contextBridge.exposeInMainWorld('skilldex', {
     check: (): Promise<(UpdateInfo & { currentVersion: string }) | null> =>
       ipcRenderer.invoke('skilldex:check-for-update'),
     openRelease: (url: string): Promise<boolean> => ipcRenderer.invoke('skilldex:open-release', url),
+  },
+  mods: {
+    list: (): Promise<ModsSnapshot> => ipcRenderer.invoke('skilldex:list-mods'),
+    setEnabled: (id: string, enabled: boolean): Promise<ModsSnapshot> =>
+      ipcRenderer.invoke('skilldex:set-mod-enabled', id, enabled),
+    getDetail: (id: string): Promise<ModDetail | null> => ipcRenderer.invoke('skilldex:get-mod-detail', id),
+    reveal: (id: string): Promise<boolean> => ipcRenderer.invoke('skilldex:reveal-mod', id),
   },
 })

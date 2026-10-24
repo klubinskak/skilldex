@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { checkForUpdate, fetchLatestMacYml, isReleaseUrl, type UpdateInfo } from './update-check'
 import { setupAutoUpdates } from './updater'
+import { createModCatalog } from './mods/mod-catalog'
 import { createConfigStore } from './workspace/config'
 import { createSkillWorkspace } from './workspace/skill-workspace'
 import type {
@@ -113,6 +114,16 @@ app.whenReady().then(() => {
     if (!isReleaseUrl(url)) return false
     await shell.openExternal(url)
     return true
+  })
+
+  const mods = createModCatalog({ homeDir: os.homedir() })
+  ipcMain.handle('skilldex:list-mods', () => mods.list())
+  ipcMain.handle('skilldex:set-mod-enabled', (_event, id: string, enabled: boolean) => mods.setEnabled(id, enabled))
+  ipcMain.handle('skilldex:get-mod-detail', (_event, id: string) => mods.getDetail(id))
+  ipcMain.handle('skilldex:reveal-mod', async (_event, id: string) => {
+    const target = await mods.resolvePath(id)
+    if (target) shell.showItemInFolder(target)
+    return target !== null
   })
 
   createMainWindow()
