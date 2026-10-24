@@ -10,6 +10,7 @@ import type {
   WorkspaceConfig,
   WorkspaceSnapshot,
 } from '../main/workspace/types'
+import type { UpdateInfo } from '../main/update-check'
 
 contextBridge.exposeInMainWorld('skilldex', {
   workspace: {
@@ -47,5 +48,10 @@ contextBridge.exposeInMainWorld('skilldex', {
       ipcRenderer.invoke('skilldex:mark-skill-reviewed', id, reviewed),
     scanRepoSkill: (input: ScanRepoSkillInput): Promise<SkillScan> =>
       ipcRenderer.invoke('skilldex:scan-repo-skill', input),
+  },
+  updates: {
+    check: (): Promise<(UpdateInfo & { currentVersion: string }) | null> =>
+      ipcRenderer.invoke('skilldex:check-for-update'),
+    openRelease: (url: string): Promise<boolean> => ipcRenderer.invoke('skilldex:open-release', url),
   },
 })
