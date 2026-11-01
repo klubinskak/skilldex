@@ -96,6 +96,7 @@ app.whenReady().then(() => {
   ipcMain.handle('skilldex:scan-repo-skill', (_event, input: ScanRepoSkillInput) =>
     workspace.scanRepoSkill(input),
   )
+  ipcMain.handle('skilldex:get-skill-usage', () => workspace.getSkillUsage())
 
   // Windows and Linux update themselves (updater.ts). macOS can't without a
   // signed app, so there the sidebar only says a new version is out.

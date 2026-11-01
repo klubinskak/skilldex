@@ -7,6 +7,7 @@ import type {
   SkillFile,
   SkillScan,
   SkillScanResult,
+  SkillUsage,
   WorkspaceConfig,
   WorkspaceSnapshot,
 } from '../main/workspace/types'
@@ -49,6 +50,7 @@ contextBridge.exposeInMainWorld('skilldex', {
       ipcRenderer.invoke('skilldex:mark-skill-reviewed', id, reviewed),
     scanRepoSkill: (input: ScanRepoSkillInput): Promise<SkillScan> =>
       ipcRenderer.invoke('skilldex:scan-repo-skill', input),
+    getSkillUsage: (): Promise<Record<string, SkillUsage>> => ipcRenderer.invoke('skilldex:get-skill-usage'),
   },
   updates: {
     check: (): Promise<(UpdateInfo & { currentVersion: string }) | null> =>

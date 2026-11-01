@@ -91,6 +91,8 @@ export function Dashboard() {
     removeRepo,
     refreshRepo,
     installRepoSkill,
+    usage,
+    usageLoading,
   } = useWorkspace()
   const mods = useMods()
   const [showMods, setShowMods] = useState(false)
@@ -226,6 +228,9 @@ export function Dashboard() {
           <SkillDetail
             skill={selected}
             scan={scans[selected.id]}
+            usage={usage[selected.name] ?? null}
+            usageLoading={usageLoading}
+            homeDir={snapshot.homeDir}
             requestScan={requestScan}
             onMarkReviewed={(reviewed) => void markReviewed(selected.id, reviewed)}
             getReadme={getReadme}

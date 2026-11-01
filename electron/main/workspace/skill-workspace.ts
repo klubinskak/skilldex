@@ -28,6 +28,7 @@ import {
 } from './repo-catalog'
 import { scanSkillDir } from './security/scan-skill-dir'
 import { scanSkillFiles } from './security/scanner'
+import { scanSkillUsage } from './skill-usage'
 import {
   disableSkillDir,
   enableSkillDir,
@@ -45,6 +46,7 @@ import type {
   SkillRecord,
   SkillScan,
   SkillScanResult,
+  SkillUsage,
   SourceRecord,
   WorkspaceConfig,
   WorkspaceSnapshot,
@@ -95,6 +97,8 @@ export type SkillWorkspace = {
   markSkillReviewed(id: string, reviewed: boolean): Promise<SkillScanResult | null>
   /** Scan a configured repo skill's files before installing (nothing is written). */
   scanRepoSkill(input: ScanRepoSkillInput): Promise<SkillScan>
+  /** Actual invocation counts, by skill name, read from Claude Code's session transcripts. */
+  getSkillUsage(): Promise<Record<string, SkillUsage>>
 }
 
 /** Management is only meaningful for skills we own on disk, never plugin skills. */
@@ -433,6 +437,10 @@ export function createSkillWorkspace({
         fetchImpl,
       })
       return scanSkillFiles(scanFiles)
+    },
+
+    async getSkillUsage() {
+      return scanSkillUsage(homeDir)
     },
   }
 }
