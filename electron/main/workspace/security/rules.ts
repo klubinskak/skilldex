@@ -23,6 +23,13 @@ export type LineRule = {
   pattern: RegExp
   why: string
   appliesTo: 'all' | 'doc'
+  /**
+   * When true, a hit from this rule (on a code line, not a comment) can be paired
+   * with a network call to synthesize the red credential-exfiltration finding.
+   * Only real credential *file* reads qualify: a secret-looking env var name next
+   * to a network call is how every API client authenticates, not exfiltration.
+   */
+  correlatesWithNetwork?: boolean
 }
 
 /** Markdown files are docs; known script extensions are scripts; the rest are `other`. */
@@ -104,8 +111,11 @@ export const LINE_RULES: LineRule[] = [
   {
     category: 'network-access',
     severity: 'amber',
+    // `curl`/`wget` are unambiguous anywhere. Short tool names (`nc`, `scp`, …)
+    // only count in command position, so "BY-NC" in a licence name is not netcat.
+    // Library calls must be actual calls, not `import urllib.request`.
     pattern:
-      /\b(?:curl|wget|nc|ncat|telnet|scp|sftp|Invoke-WebRequest|Invoke-RestMethod)\b|\b(?:fetch|axios|urllib|requests)\.(?:get|post|put|request|urlopen)\b|\brequire\(['"](?:https?|net)['"]\)/i,
+      /\b(?:curl|wget|Invoke-WebRequest|Invoke-RestMethod)\b|(?:^|[|;&(`]|\$\(|\bsudo\s+|\bxargs\s+|["'])\s*(?:nc|ncat|telnet|scp|sftp)(?:\s|["']|$)|\b(?:axios|requests|urllib\.request)\.(?:get|post|put|patch|delete|request|urlopen)\s*\(|\burlopen\s*\(|\brequire\(['"](?:https?|net)['"]\)/i,
     why: 'Makes an outbound network request. Often legitimate, but worth confirming where the data goes.',
     appliesTo: 'all',
   },
@@ -114,10 +124,12 @@ export const LINE_RULES: LineRule[] = [
   {
     category: 'sensitive-path-read',
     severity: 'amber',
+    // `(?<!\w)` before `.env` so `process.env.X` (an env var) is not a `.env` file.
     pattern:
-      /(?:~|\$HOME|\/home\/[^\s/]+|\/Users\/[^\s/]+)?\/?\.(?:aws|ssh|npmrc|netrc|kube|docker\/config|config\/gh)\b|\bid_rsa\b|\.env(?:\.[a-z]+)?\b/i,
+      /(?:~|\$HOME|\/home\/[^\s/]+|\/Users\/[^\s/]+)?\/?\.(?:aws|ssh|npmrc|netrc|kube|docker\/config|config\/gh)\b|\bid_rsa\b|(?<!\w)\.env(?:\.[a-z]+)?\b/i,
     why: 'References a sensitive credentials path (AWS/SSH/env/etc.).',
     appliesTo: 'all',
+    correlatesWithNetwork: true,
   },
   {
     category: 'sensitive-path-read',
@@ -131,7 +143,8 @@ export const LINE_RULES: LineRule[] = [
   {
     category: 'dynamic-eval',
     severity: 'amber',
-    pattern: /\b(?:eval|exec)\s*\(|\bos\.system\s*\(|\bsubprocess\.(?:call|run|Popen)\b|\bchild_process\b|\bexecSync\s*\(/,
+    // `(?<![.\w])` so a method call like `/re/.exec(text)` is not code execution.
+    pattern: /(?<![.\w])(?:eval|exec)\s*\(|\bos\.system\s*\(|\bsubprocess\.(?:call|run|Popen)\b|\bchild_process\b|\bexecSync\s*\(/,
     why: 'Executes dynamically built code or spawns a shell — a common vector for hidden behaviour.',
     appliesTo: 'all',
   },
