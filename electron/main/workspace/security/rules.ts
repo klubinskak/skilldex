@@ -111,12 +111,23 @@ export const LINE_RULES: LineRule[] = [
   {
     category: 'network-access',
     severity: 'amber',
-    // `curl`/`wget` are unambiguous anywhere. Short tool names (`nc`, `scp`, …)
-    // only count in command position, so "BY-NC" in a licence name is not netcat.
-    // Library calls must be actual calls, not `import urllib.request`.
+    // Tool names match anywhere: none is an everyday English word. `nc` is the
+    // exception and has its own rule below. Library use must be an actual call:
+    // `requests.get(...)` / `urlopen(...)` count, `import urllib.request` does not.
     pattern:
-      /\b(?:curl|wget|Invoke-WebRequest|Invoke-RestMethod)\b|(?:^|[|;&(`]|\$\(|\bsudo\s+|\bxargs\s+|["'])\s*(?:nc|ncat|telnet|scp|sftp)(?:\s|["']|$)|\b(?:axios|requests|urllib\.request)\.(?:get|post|put|patch|delete|request|urlopen)\s*\(|\burlopen\s*\(|\brequire\(['"](?:https?|net)['"]\)/i,
+      /\b(?:curl|wget|ncat|telnet|scp|sftp|Invoke-WebRequest|Invoke-RestMethod)\b|\b(?:axios|requests|urllib\.request)\.(?:get|post|put|patch|delete|request|urlopen)\s*\(|\burlopen\s*\(|\brequire\(['"](?:https?|net)['"]\)/i,
     why: 'Makes an outbound network request. Often legitimate, but worth confirming where the data goes.',
+    appliesTo: 'all',
+  },
+  {
+    category: 'network-access',
+    severity: 'amber',
+    // Netcat by its usage shape, not its two letters: lowercase `nc`, optional
+    // flags, an optional host, then a port. Catches `nc host 4444`, `nc -l 4444`,
+    // `/usr/bin/nc …`, `then nc …`, `timeout 5 nc …`; skips "BY-NC" licence names.
+    // Case-sensitive on purpose.
+    pattern: /(?<![\w-])nc\s+(?:-\S+\s+)*(?:[\w.:-]+\s+)?\d{1,5}\b/,
+    why: 'Opens a raw network connection with netcat. Worth confirming where the data goes.',
     appliesTo: 'all',
   },
 
@@ -143,8 +154,10 @@ export const LINE_RULES: LineRule[] = [
   {
     category: 'dynamic-eval',
     severity: 'amber',
-    // `(?<![.\w])` so a method call like `/re/.exec(text)` is not code execution.
-    pattern: /(?<![.\w])(?:eval|exec)\s*\(|\bos\.system\s*\(|\bsubprocess\.(?:call|run|Popen)\b|\bchild_process\b|\bexecSync\s*\(/,
+    // A bare `eval(`/`exec(` always counts, and so does `x.exec(` (`shell.exec`,
+    // `cp.exec`), unless the receiver is clearly a regex: a `/…/flags` literal,
+    // an ALL_CAPS constant, or a name ending in re/regex/regexp/pat/pattern.
+    pattern: /(?<![.\w])(?:eval|exec)\s*\(|(?<!\/[dgimsuyv]*|\b[A-Z][A-Z0-9_]*|(?:[rR]e|[rR]egexp?|[pP]at|[pP]attern|RE|REGEXP?|PAT|PATTERN))\.exec\s*\(|\bos\.system\s*\(|\bsubprocess\.(?:call|run|Popen)\b|\bchild_process\b|\bexecSync\s*\(/,
     why: 'Executes dynamically built code or spawns a shell — a common vector for hidden behaviour.',
     appliesTo: 'all',
   },

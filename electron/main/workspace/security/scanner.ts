@@ -27,7 +27,7 @@ export function scanSkillFiles(files: ScanFile[]): SkillScan {
 
   for (const file of files) {
     if (file.contents === null) {
-      if (isSuspiciousBinary(file.relativePath)) {
+      if (isSuspiciousBinary(file.relativePath) && !isCiConfig(file.relativePath)) {
         findings.push({
           severity: 'amber',
           category: 'suspicious-binary',
@@ -41,14 +41,12 @@ export function scanSkillFiles(files: ScanFile[]): SkillScan {
     }
 
     const role = roleOf(file.relativePath)
-    const ciOnly = isCiConfig(file.relativePath)
     const lines = file.contents.split(/\r?\n/)
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]
       for (const rule of LINE_RULES) {
         if (rule.appliesTo === 'doc' && role !== 'doc') continue
-        if (ciOnly && rule.severity !== 'red') continue
         if (!rule.pattern.test(line)) continue
         const finding: SkillFinding = {
           severity: rule.severity,
@@ -64,8 +62,10 @@ export function scanSkillFiles(files: ScanFile[]): SkillScan {
     }
   }
 
+  // `.github/` files still feed the red exfiltration check (SKILL.md can run a
+  // script stored there), so their amber findings are dropped only afterwards.
   correlateExfiltration(findings, credentialReads)
-  const ranked = rank(dropSubsumedAmber(findings))
+  const ranked = rank(dropSubsumedAmber(dropCiAmber(findings)))
   return { verdict: verdictFor(ranked), findings: ranked }
 }
 
@@ -126,7 +126,16 @@ function isCiConfig(relativePath: string): boolean {
   return relativePath.startsWith('.github/')
 }
 
-/** A whole-line comment: `#` (not a `#!` shebang), `//`, `/*`, ` *` or `<!--`. */
+/** Amber findings in CI config are noise for the user; red ones are kept. */
+function dropCiAmber(findings: SkillFinding[]): SkillFinding[] {
+  return findings.filter((f) => f.severity === 'red' || !isCiConfig(f.file))
+}
+
+/**
+ * A whole-line comment: `#` (not a `#!` shebang), `//`, `/*`, ` *` or `<!--`.
+ * In Markdown `#` and `*` are also headings and bullets, which is fine here:
+ * a heading or bullet that names a path is prose, not a read.
+ */
 function isCommentLine(line: string): boolean {
   return /^\s*(?:#(?!!)|\/\/|\/\*|\*|<!--)/.test(line)
 }
