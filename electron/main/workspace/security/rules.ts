@@ -23,6 +23,13 @@ export type LineRule = {
   pattern: RegExp
   why: string
   appliesTo: 'all' | 'doc'
+  /**
+   * When true, a hit from this rule (on a code line, not a comment) can be paired
+   * with a network call to synthesize the red credential-exfiltration finding.
+   * Only real credential *file* reads qualify: a secret-looking env var name next
+   * to a network call is how every API client authenticates, not exfiltration.
+   */
+  correlatesWithNetwork?: boolean
 }
 
 /** Markdown files are docs; known script extensions are scripts; the rest are `other`. */
@@ -104,9 +111,23 @@ export const LINE_RULES: LineRule[] = [
   {
     category: 'network-access',
     severity: 'amber',
+    // Tool names match anywhere: none is an everyday English word. `nc` is the
+    // exception and has its own rule below. Library use must be an actual call:
+    // `requests.get(...)` / `urlopen(...)` count, `import urllib.request` does not.
     pattern:
-      /\b(?:curl|wget|nc|ncat|telnet|scp|sftp|Invoke-WebRequest|Invoke-RestMethod)\b|\b(?:fetch|axios|urllib|requests)\.(?:get|post|put|request|urlopen)\b|\brequire\(['"](?:https?|net)['"]\)/i,
+      /\b(?:curl|wget|ncat|telnet|scp|sftp|Invoke-WebRequest|Invoke-RestMethod)\b|\b(?:axios|requests|urllib\.request)\.(?:get|post|put|patch|delete|request|urlopen)\s*\(|\burlopen\s*\(|\brequire\(['"](?:https?|net)['"]\)/i,
     why: 'Makes an outbound network request. Often legitimate, but worth confirming where the data goes.',
+    appliesTo: 'all',
+  },
+  {
+    category: 'network-access',
+    severity: 'amber',
+    // Netcat by its usage shape, not its two letters: lowercase `nc`, optional
+    // flags, an optional host, then a port. Catches `nc host 4444`, `nc -l 4444`,
+    // `/usr/bin/nc …`, `then nc …`, `timeout 5 nc …`; skips "BY-NC" licence names.
+    // Case-sensitive on purpose.
+    pattern: /(?<![\w-])nc\s+(?:-\S+\s+)*(?:[\w.:-]+\s+)?\d{1,5}\b/,
+    why: 'Opens a raw network connection with netcat. Worth confirming where the data goes.',
     appliesTo: 'all',
   },
 
@@ -114,10 +135,12 @@ export const LINE_RULES: LineRule[] = [
   {
     category: 'sensitive-path-read',
     severity: 'amber',
+    // `(?<!\w)` before `.env` so `process.env.X` (an env var) is not a `.env` file.
     pattern:
-      /(?:~|\$HOME|\/home\/[^\s/]+|\/Users\/[^\s/]+)?\/?\.(?:aws|ssh|npmrc|netrc|kube|docker\/config|config\/gh)\b|\bid_rsa\b|\.env(?:\.[a-z]+)?\b/i,
+      /(?:~|\$HOME|\/home\/[^\s/]+|\/Users\/[^\s/]+)?\/?\.(?:aws|ssh|npmrc|netrc|kube|docker\/config|config\/gh)\b|\bid_rsa\b|(?<!\w)\.env(?:\.[a-z]+)?\b/i,
     why: 'References a sensitive credentials path (AWS/SSH/env/etc.).',
     appliesTo: 'all',
+    correlatesWithNetwork: true,
   },
   {
     category: 'sensitive-path-read',
@@ -131,7 +154,10 @@ export const LINE_RULES: LineRule[] = [
   {
     category: 'dynamic-eval',
     severity: 'amber',
-    pattern: /\b(?:eval|exec)\s*\(|\bos\.system\s*\(|\bsubprocess\.(?:call|run|Popen)\b|\bchild_process\b|\bexecSync\s*\(/,
+    // A bare `eval(`/`exec(` always counts, and so does `x.exec(` (`shell.exec`,
+    // `cp.exec`), unless the receiver is clearly a regex: a `/…/flags` literal,
+    // an ALL_CAPS constant, or a name ending in re/regex/regexp/pat/pattern.
+    pattern: /(?<![.\w])(?:eval|exec)\s*\(|(?<!\/[dgimsuyv]*|\b[A-Z][A-Z0-9_]*|(?:[rR]e|[rR]egexp?|[pP]at|[pP]attern|RE|REGEXP?|PAT|PATTERN))\.exec\s*\(|\bos\.system\s*\(|\bsubprocess\.(?:call|run|Popen)\b|\bchild_process\b|\bexecSync\s*\(/,
     why: 'Executes dynamically built code or spawns a shell — a common vector for hidden behaviour.',
     appliesTo: 'all',
   },
