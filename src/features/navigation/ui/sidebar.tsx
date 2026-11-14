@@ -65,36 +65,37 @@ export function Sidebar({ active, counts, projects, repos, activeRepo, activePro
         </span>
       </label>
 
-      <div className="px-2 pb-2 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-[#52525b]">Library</div>
-      <nav className="flex flex-col gap-0.5">
-        {NAV.map((item) => {
-          const Icon = item.icon
-          const isActive = active === item.key && activeRepo === null && activeProject === null && !modsActive
-          return (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => onFilter(item.key)}
-              className={`flex items-center gap-3 rounded-[9px] px-2 py-2 text-[13.5px] font-medium transition ${
-                isActive
-                  ? 'bg-[#1a1109] text-[#fb923c] shadow-[inset_2px_0_0_#f97316]'
-                  : 'text-[#a1a1aa] hover:bg-[#141417]'
-              }`}
-            >
-              <span className="flex w-[18px] justify-center">
-                <Icon className="size-[15px]" />
-              </span>
-              <span className="flex-1 text-left">{item.label}</span>
-              <span className={`font-mono text-[11px] ${isActive ? 'text-[#fb923c]' : 'text-[#52525b]'}`}>
-                {counts[item.key]}
-              </span>
-            </button>
-          )
-        })}
-      </nav>
-
-      {/* Repos and projects scroll, so the update card and footer always stay in view. */}
+      {/* Everything between the search and the footer scrolls as one list, so
+          no section slides under a fixed one. The update card and footer stay in view. */}
       <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-3">
+        <div className="px-2 pb-2 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-[#52525b]">Library</div>
+        <nav className="flex flex-col gap-0.5">
+          {NAV.map((item) => {
+            const Icon = item.icon
+            const isActive = active === item.key && activeRepo === null && activeProject === null && !modsActive
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => onFilter(item.key)}
+                className={`flex items-center gap-3 rounded-[9px] px-2 py-2 text-[13.5px] font-medium transition ${
+                  isActive
+                    ? 'bg-[#1a1109] text-[#fb923c] shadow-[inset_2px_0_0_#f97316]'
+                    : 'text-[#a1a1aa] hover:bg-[#141417]'
+                }`}
+              >
+                <span className="flex w-[18px] justify-center">
+                  <Icon className="size-[15px]" />
+                </span>
+                <span className="flex-1 text-left">{item.label}</span>
+                <span className={`font-mono text-[11px] ${isActive ? 'text-[#fb923c]' : 'text-[#52525b]'}`}>
+                  {counts[item.key]}
+                </span>
+              </button>
+            )
+          })}
+        </nav>
+
         <div className="px-2 pb-2 pt-5 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-[#52525b]">
           Claude Code
         </div>
