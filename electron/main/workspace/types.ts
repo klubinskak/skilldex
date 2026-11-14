@@ -158,8 +158,18 @@ export type RepoCatalog = {
   truncated: boolean
   /** GitHub stargazer count — a reputation signal, shown apart from the safety scan. */
   stars?: number
-  /** Present when the repo could not be scanned (network, rate limit, 404). */
+  /**
+   * Present when the repo could not be scanned (network, rate limit, 404) and
+   * there is no earlier scan to show instead.
+   */
   error?: string
+  /** When this catalog was fetched from GitHub (epoch ms). */
+  fetchedAt?: number
+  /**
+   * Present when the latest scan failed but an earlier one is shown instead
+   * (see `fetchedAt` for its age). The skills are usable, just maybe outdated.
+   */
+  refreshError?: string
 }
 
 export type InstallRepoSkillInput = {

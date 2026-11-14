@@ -26,6 +26,7 @@ import {
   type FetchLike,
   type RepoScan,
 } from './repo-catalog'
+import type { RepoCache } from './repo-cache'
 import { scanSkillDir } from './security/scan-skill-dir'
 import { scanSkillFiles } from './security/scanner'
 import {
@@ -55,7 +56,20 @@ export type SkillWorkspaceDeps = {
   configStore: ConfigStore
   /** Injected in tests; defaults to the global fetch. */
   fetchImpl?: FetchLike
+  /**
+   * Last good scan per skill repo, kept across launches. Optional: without it
+   * every launch rescans every repo (and a failed scan is a plain error).
+   */
+  repoCache?: RepoCache
+  /** Clock, injected in tests. */
+  now?: () => number
 }
+
+/**
+ * A repo scanned this recently is served from the on-disk cache at launch
+ * instead of hitting the GitHub API again. Refresh always fetches.
+ */
+export const REPO_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000
 
 export type SkillWorkspace = {
   getConfig(): Promise<WorkspaceConfig>
@@ -107,6 +121,8 @@ export function createSkillWorkspace({
   homeDir,
   configStore,
   fetchImpl = globalThis.fetch as unknown as FetchLike,
+  repoCache,
+  now = Date.now,
 }: SkillWorkspaceDeps): SkillWorkspace {
   // Ids seen in the most recent snapshot — the allow-list guarding path access
   // so the renderer can never read or reveal an arbitrary filesystem path.
@@ -116,17 +132,67 @@ export function createSkillWorkspace({
   // renderer sees the serializable catalog, while the per-skill file lists stay
   // here so installs can only ever fetch paths we discovered ourselves.
   const repoScans = new Map<string, RepoScan>()
+  // Scans currently running, keyed by slug, so overlapping requests share one.
+  const scansInFlight = new Map<string, Promise<RepoScan>>()
 
   // Last scan per skill id, with the content hash it was computed against. Lets
   // `markSkillReviewed` reuse the hash the user just saw without re-reading disk.
   const scanCache = new Map<string, { hash: string; scan: SkillScan }>()
 
-  async function scanRepo(slug: string, force = false): Promise<RepoScan> {
-    const cached = repoScans.get(slug)
-    if (cached && !force) return cached
-    const scan = await fetchRepoCatalog({ slug }, fetchImpl)
-    repoScans.set(slug, scan)
+  /** Fetch a repo from GitHub and remember the result in memory and on disk. */
+  async function fetchAndStore(slug: string, scan?: RepoScan): Promise<RepoScan> {
+    const fetched = scan ?? (await fetchRepoCatalog({ slug }, fetchImpl))
+    const fetchedAt = now()
+    const stored = { ...fetched, catalog: { ...fetched.catalog, fetchedAt } }
+    repoScans.set(slug, stored)
+    await repoCache?.set(slug, stored, fetchedAt)
+    return stored
+  }
+
+  /**
+   * One repo's scan, cheapest source first: this session's memory, then a
+   * recent on-disk scan, then GitHub. `force` (Refresh) always goes to GitHub.
+   * If GitHub fails (rate limit, offline) and an earlier scan exists on disk,
+   * that scan is returned with `refreshError` set instead of throwing.
+   *
+   * Calls for the same repo that overlap share one scan: the renderer can ask
+   * for the list twice at startup, and each GitHub call counts against the
+   * hourly limit.
+   */
+  function scanRepo(slug: string, force = false): Promise<RepoScan> {
+    const pending = scansInFlight.get(slug)
+    if (pending) return pending
+    const scan = loadRepoScan(slug, force).finally(() => scansInFlight.delete(slug))
+    scansInFlight.set(slug, scan)
     return scan
+  }
+
+  async function loadRepoScan(slug: string, force: boolean): Promise<RepoScan> {
+    const inMemory = repoScans.get(slug)
+    if (inMemory && !force) return inMemory
+
+    const onDisk = await repoCache?.get(slug)
+    if (onDisk && !force && now() - onDisk.fetchedAt < REPO_CACHE_MAX_AGE_MS) {
+      const scan = { ...onDisk.scan, catalog: { ...onDisk.scan.catalog, fetchedAt: onDisk.fetchedAt } }
+      repoScans.set(slug, scan)
+      return scan
+    }
+
+    try {
+      return await fetchAndStore(slug)
+    } catch (cause) {
+      // An earlier scan from this session beats one from disk: it's at least as new.
+      const fallback = inMemory ?? (onDisk && { ...onDisk.scan, catalog: { ...onDisk.scan.catalog, fetchedAt: onDisk.fetchedAt } })
+      if (!fallback) throw cause
+      const scan = {
+        ...fallback,
+        catalog: { ...fallback.catalog, refreshError: cause instanceof Error ? cause.message : String(cause) },
+      }
+      // Kept in memory so the rest of this session doesn't retry on every
+      // render; Refresh (force) still tries GitHub again.
+      repoScans.set(slug, scan)
+      return scan
+    }
   }
 
   async function catalogsFor(slugs: string[]): Promise<RepoCatalog[]> {
@@ -321,8 +387,7 @@ export function createSkillWorkspace({
 
       // Scan before persisting, so a typo'd or unreachable repo is rejected
       // with the fetch error instead of being saved broken.
-      const scan = await fetchRepoCatalog(parsed, fetchImpl)
-      repoScans.set(parsed.slug, scan)
+      await fetchAndStore(parsed.slug, await fetchRepoCatalog(parsed, fetchImpl))
 
       const config = await configStore.load()
       const saved = config.skillRepos.includes(parsed.slug)
@@ -338,6 +403,7 @@ export function createSkillWorkspace({
         skillRepos: config.skillRepos.filter((existing) => existing !== slug),
       })
       repoScans.delete(slug)
+      await repoCache?.delete(slug)
       return catalogsFor(saved.skillRepos)
     },
 

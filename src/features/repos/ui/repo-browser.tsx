@@ -133,12 +133,22 @@ export function RepoBrowser({
               {catalog.skills.length} {catalog.skills.length === 1 ? 'skill' : 'skills'} on{' '}
               <span className="font-mono">{catalog.ref}</span>
               {catalog.truncated ? ' (listing truncated — very large repo)' : ''}
+              {catalog.fetchedAt !== undefined && !catalog.refreshError ? ` · updated ${formatAge(catalog.fetchedAt)}` : ''}
             </span>
           </div>
         )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-7 pb-7 pt-5">
+        {catalog.refreshError && (
+          <div className="mb-4 flex items-center gap-2 rounded-xl border border-[#3a2c12] bg-[#17120a] px-4 py-3 text-[13px] text-[#fbbf24]">
+            <AlertCircle className="size-4 shrink-0" />
+            <span>
+              Couldn't update from GitHub: {catalog.refreshError} Showing the skills from{' '}
+              {catalog.fetchedAt !== undefined ? formatAge(catalog.fetchedAt) : 'the last update'}.
+            </span>
+          </div>
+        )}
         {catalog.error ? (
           <div className="flex items-center gap-2 rounded-xl border border-[#3f2020] bg-[#1a0f0f] px-4 py-3 text-[13px] text-[#f87171]">
             <AlertCircle className="size-4 shrink-0" />
@@ -263,6 +273,17 @@ function RepoSkillCard({
 }
 
 /** Compact star count: 1234 → "1.2k", 12000 → "12k". */
+/** "just now", "5 min ago", "3 h ago", "2 days ago" for an epoch-ms timestamp. */
+function formatAge(timestamp: number): string {
+  const minutes = Math.floor((Date.now() - timestamp) / 60_000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} h ago`
+  const days = Math.floor(hours / 24)
+  return days === 1 ? '1 day ago' : `${days} days ago`
+}
+
 function formatStars(count: number): string {
   if (count < 1000) return String(count)
   const thousands = count / 1000

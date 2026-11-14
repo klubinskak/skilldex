@@ -172,6 +172,10 @@ export type RepoCatalog = {
   truncated: boolean
   stars?: number
   error?: string
+  /** When this catalog was fetched from GitHub (epoch ms). */
+  fetchedAt?: number
+  /** The latest scan failed; an earlier one (from `fetchedAt`) is shown instead. */
+  refreshError?: string
 }
 
 export type InstallRepoSkillInput = {

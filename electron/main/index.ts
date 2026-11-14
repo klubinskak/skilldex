@@ -6,6 +6,7 @@ import { createUpdateChecker, fetchLatestMacYml, isReleaseUrl } from './update-c
 import { setupAutoUpdates } from './updater'
 import { createModCatalog } from './mods/mod-catalog'
 import { createConfigStore } from './workspace/config'
+import { createRepoCache } from './workspace/repo-cache'
 import { createSkillWorkspace } from './workspace/skill-workspace'
 import type {
   CreateSkillInput,
@@ -51,7 +52,8 @@ app.whenReady().then(() => {
   }
 
   const configStore = createConfigStore(path.join(app.getPath('userData'), 'config.json'))
-  const workspace = createSkillWorkspace({ homeDir: os.homedir(), configStore })
+  const repoCache = createRepoCache(path.join(app.getPath('userData'), 'repo-cache.json'))
+  const workspace = createSkillWorkspace({ homeDir: os.homedir(), configStore, repoCache })
 
   ipcMain.handle('skilldex:get-config', () => workspace.getConfig())
   ipcMain.handle('skilldex:get-snapshot', () => workspace.getSnapshot())
