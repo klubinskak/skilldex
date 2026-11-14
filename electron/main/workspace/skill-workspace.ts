@@ -132,6 +132,8 @@ export function createSkillWorkspace({
   // renderer sees the serializable catalog, while the per-skill file lists stay
   // here so installs can only ever fetch paths we discovered ourselves.
   const repoScans = new Map<string, RepoScan>()
+  // Scans currently running, keyed by slug, so overlapping requests share one.
+  const scansInFlight = new Map<string, Promise<RepoScan>>()
 
   // Last scan per skill id, with the content hash it was computed against. Lets
   // `markSkillReviewed` reuse the hash the user just saw without re-reading disk.
@@ -152,8 +154,20 @@ export function createSkillWorkspace({
    * recent on-disk scan, then GitHub. `force` (Refresh) always goes to GitHub.
    * If GitHub fails (rate limit, offline) and an earlier scan exists on disk,
    * that scan is returned with `refreshError` set instead of throwing.
+   *
+   * Calls for the same repo that overlap share one scan: the renderer can ask
+   * for the list twice at startup, and each GitHub call counts against the
+   * hourly limit.
    */
-  async function scanRepo(slug: string, force = false): Promise<RepoScan> {
+  function scanRepo(slug: string, force = false): Promise<RepoScan> {
+    const pending = scansInFlight.get(slug)
+    if (pending) return pending
+    const scan = loadRepoScan(slug, force).finally(() => scansInFlight.delete(slug))
+    scansInFlight.set(slug, scan)
+    return scan
+  }
+
+  async function loadRepoScan(slug: string, force: boolean): Promise<RepoScan> {
     const inMemory = repoScans.get(slug)
     if (inMemory && !force) return inMemory
 

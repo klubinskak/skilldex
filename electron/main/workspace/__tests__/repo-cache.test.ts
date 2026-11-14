@@ -196,6 +196,19 @@ describe('skill repos with the cache', () => {
     expect(refreshed.refreshError).toBeUndefined()
   })
 
+  it('fetches a repo once when the list is asked for twice at the same time', async () => {
+    const github = fakeGitHub()
+    await launch(github.fetch).addSkillRepo(SLUG)
+    await fs.rm(path.join(base, 'repo-cache.json'))
+    const callsAfterAdd = github.state.apiCalls
+
+    const ws = launch(github.fetch)
+    await Promise.all([ws.listRepoCatalogs(), ws.listRepoCatalogs()])
+
+    // One scan is two API calls (repo metadata + tree).
+    expect(github.state.apiCalls - callsAfterAdd).toBe(2)
+  })
+
   it('drops a removed repo from the cache', async () => {
     const github = fakeGitHub()
     const ws = launch(github.fetch)
