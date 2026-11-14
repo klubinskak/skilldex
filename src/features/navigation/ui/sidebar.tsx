@@ -1,4 +1,4 @@
-import { AlertCircle, Blocks, Boxes, FolderGit2, Globe, Heart, LayoutGrid, Monitor, PackageSearch, Plus, PowerOff, Puzzle, Search, Settings, User } from 'lucide-react'
+import { AlertCircle, Blocks, Boxes, FolderGit2, Globe, Heart, LayoutGrid, Monitor, PackageSearch, Plus, PowerOff, Puzzle, Search, Settings, Trash2, User } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { UpdateCard } from '@/features/updates/ui/update-card'
 import { ACCENT_PALETTE, type ProjectRecord, type RepoCatalog } from '@/features/skills/model/skills'
@@ -26,6 +26,8 @@ type SidebarProps = {
   onSelectRepo: (slug: string) => void
   onSelectProject: (name: string) => void
   onAddRepo: () => void
+  /** Forget a skill repo. Installed skills stay where they are. */
+  onRemoveRepo: (slug: string) => void
   onOpenSettings: () => void
   onOpenMods: () => void
 }
@@ -40,7 +42,7 @@ const NAV: Array<{ key: FilterKey; label: string; icon: ComponentType<{ classNam
   { key: 'disabled', label: 'Disabled', icon: PowerOff },
 ]
 
-export function Sidebar({ active, counts, projects, repos, activeRepo, activeProject, modCount, modsActive, query, onQuery, onFilter, onSelectRepo, onSelectProject, onAddRepo, onOpenSettings, onOpenMods }: SidebarProps) {
+export function Sidebar({ active, counts, projects, repos, activeRepo, activeProject, modCount, modsActive, query, onQuery, onFilter, onSelectRepo, onSelectProject, onAddRepo, onRemoveRepo, onOpenSettings, onOpenMods }: SidebarProps) {
   return (
     <aside className="flex w-[248px] shrink-0 flex-col border-r border-[#1c1c20] bg-[#0b0b0d] px-3 py-3.5">
       <div className="flex items-center gap-2.5 px-2 pb-3.5 pt-1.5">
@@ -129,29 +131,45 @@ export function Sidebar({ active, counts, projects, repos, activeRepo, activePro
           ) : (
             repos.map((repo) => {
               const isActive = activeRepo === repo.slug
+              // The row and its remove icon are sibling buttons (a button can't
+              // hold another button). The icon replaces the count on hover or
+              // keyboard focus (not mouse focus, which would leave it showing on
+              // the last clicked row), so the row keeps its resting look.
               return (
-                <button
-                  key={repo.slug}
-                  type="button"
-                  onClick={() => onSelectRepo(repo.slug)}
-                  className={`flex items-center gap-3 rounded-[9px] px-2 py-2 text-[13px] font-medium transition ${
-                    isActive
-                      ? 'bg-[#1a1109] text-[#fb923c] shadow-[inset_2px_0_0_#f97316]'
-                      : 'text-[#a1a1aa] hover:bg-[#141417]'
-                  }`}
-                >
-                  <span className="flex w-[18px] justify-center">
-                    <PackageSearch className="size-[15px]" />
-                  </span>
-                  <span className="flex-1 truncate text-left">{repo.slug}</span>
-                  {repo.error ? (
-                    <AlertCircle className="size-3.5 shrink-0 text-[#f87171]" />
-                  ) : (
-                    <span className={`font-mono text-[11px] ${isActive ? 'text-[#fb923c]' : 'text-[#52525b]'}`}>
-                      {repo.skills.length}
+                <div key={repo.slug} className="group relative">
+                  <button
+                    type="button"
+                    onClick={() => onSelectRepo(repo.slug)}
+                    className={`flex w-full items-center gap-3 rounded-[9px] px-2 py-2 text-[13px] font-medium transition ${
+                      isActive
+                        ? 'bg-[#1a1109] text-[#fb923c] shadow-[inset_2px_0_0_#f97316]'
+                        : 'text-[#a1a1aa] hover:bg-[#141417]'
+                    }`}
+                  >
+                    <span className="flex w-[18px] justify-center">
+                      <PackageSearch className="size-[15px]" />
                     </span>
-                  )}
-                </button>
+                    <span className="flex-1 truncate text-left">{repo.slug}</span>
+                    <span className="flex min-w-5 justify-end group-hover:invisible group-has-focus-visible:invisible">
+                      {repo.error ? (
+                        <AlertCircle className="size-3.5 shrink-0 text-[#f87171]" />
+                      ) : (
+                        <span className={`font-mono text-[11px] ${isActive ? 'text-[#fb923c]' : 'text-[#52525b]'}`}>
+                          {repo.skills.length}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRemoveRepo(repo.slug)}
+                    aria-label={`Remove ${repo.slug}`}
+                    title="Remove repo (installed skills stay)"
+                    className="absolute right-1 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-md text-[#71717a] opacity-0 transition hover:bg-[#2a1414] hover:text-[#f87171] group-hover:opacity-100 group-has-focus-visible:opacity-100"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
               )
             })
           )}

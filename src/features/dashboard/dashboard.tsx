@@ -177,6 +177,14 @@ export function Dashboard() {
     return activeProject ? groups.filter((group) => group.project.name === activeProject) : groups
   }, [filter, snapshot.projects, visibleSkills, activeProject])
 
+  // A picked project whose skills are all switched off (or all filtered out by
+  // the search) has no group. Without this the page would fall back to the
+  // flat grid of every project's skills.
+  const activeProjectEmpty = activeProject !== null && projectGroups !== null && projectGroups.length === 0
+  const activeProjectDisabled = activeProject
+    ? skills.filter((skill) => !skill.enabled && skill.projects.includes(activeProject)).length
+    : 0
+
   const selected = selectedId ? skills.find((skill) => skill.id === selectedId) ?? null : null
   const heading = activeProject
     ? { title: activeProject, subtitle: `Skills available in ${activeProject}.`, pill: 'Project' }
@@ -200,6 +208,10 @@ export function Dashboard() {
         onSelectRepo={(slug) => { setActiveRepo(slug); setSelectedId(null); setActiveProject(null); setShowMods(false) }}
         onSelectProject={(name) => { setActiveProject(name); setFilter('project'); setSelectedId(null); setActiveRepo(null); setShowMods(false) }}
         onAddRepo={() => setShowAddRepo(true)}
+        onRemoveRepo={(slug) => {
+          if (activeRepo === slug) setActiveRepo(null)
+          void removeRepo(slug).catch(() => {})
+        }}
         onOpenSettings={() => setShowSettings(true)}
         onOpenMods={() => { setShowMods(true); setSelectedId(null); setActiveRepo(null); setActiveProject(null) }}
       />
@@ -304,13 +316,17 @@ export function Dashboard() {
                 <div className="flex items-center gap-2 text-[13px] text-[#71717a]">
                   <Loader2 className="size-4 animate-spin" /> Scanning your skill sources…
                 </div>
-              ) : visibleSkills.length === 0 ? (
+              ) : visibleSkills.length === 0 || activeProjectEmpty ? (
                 <div className="rounded-xl border border-dashed border-[#27272a] px-6 py-14 text-center text-[13px] text-[#71717a]">
                   {query
                     ? `No skills match “${query}”.`
                     : filter === 'project'
                       ? activeProject
-                        ? `No skills in ${activeProject} yet.`
+                        ? activeProjectDisabled > 0
+                          ? activeProjectDisabled === 1
+                            ? `The only skill in ${activeProject} is switched off. Find it under Disabled.`
+                            : `All ${activeProjectDisabled} skills in ${activeProject} are switched off. Find them under Disabled.`
+                          : `No skills in ${activeProject} yet.`
                         : 'No project skills yet. Add a project folder in Settings.'
                       : filter === 'disabled'
                         ? 'No disabled skills. Everything is switched on.'
